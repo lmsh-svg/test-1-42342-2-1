@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { AdminTabs } from '@/components/admin/admin-tabs';
-import { Loader2, Wallet, Users, Package, Coins, TicketCheck, Store, Settings, Database, DollarSign, ShoppingCart, Clock, TrendingUp, AlertTriangle, Activity, Eye, Archive, CheckCircle } from 'lucide-react';
+import { Loader2, Wallet, Users, Package, Coins, TicketCheck, Store, Settings, Database, DollarSign, ShoppingCart, Clock, TrendingUp, AlertTriangle, Activity, Eye, Archive, CheckCircle, CreditCard } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -145,6 +145,7 @@ export default function AdminDashboard() {
     { title: 'Orders', icon: Package, href: '/admin/orders', color: 'text-purple-500' },
     { title: 'Users', icon: Users, href: '/admin/users', color: 'text-blue-500' },
     { title: 'Deposits', icon: Coins, href: '/admin/deposits', color: 'text-green-500' },
+    { title: 'Manual Credit', icon: CreditCard, href: '/admin/manual-credit', color: 'text-indigo-500' },
     { title: 'Crypto Addresses', icon: Wallet, href: '/admin/crypto-addresses', color: 'text-orange-500' },
     { title: 'Verifications', icon: CheckCircle, href: '/admin/verifications', color: 'text-emerald-500' },
     { title: 'Support Tickets', icon: TicketCheck, href: '/admin/tickets', color: 'text-pink-500' },
