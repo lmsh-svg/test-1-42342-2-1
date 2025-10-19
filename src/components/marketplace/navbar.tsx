@@ -23,6 +23,8 @@ export default function Navbar() {
   useEffect(() => {
     if (user?.id) {
       fetchUserCredits();
+    } else {
+      setIsLoadingCredits(false);
     }
   }, [user?.id]);
 
@@ -63,22 +65,25 @@ export default function Navbar() {
 
           {/* Navigation Links */}
           <div className="flex items-center gap-2">
-            {/* Crypto Ticker - Next to Credits */}
+            {/* Crypto Ticker - Always visible */}
             <CryptoTicker />
 
-            {/* Credits Display - Clickable */}
-            {!isLoadingCredits && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.push('/marketplace/deposits')}
-                className="gap-2 font-semibold"
-              >
-                <Wallet className="h-4 w-4" />
-                <span className="hidden sm:inline">Credits:</span>
+            {/* Credits Display - Always visible, shows loading state */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push('/marketplace/deposits')}
+              className="gap-2 font-semibold"
+              disabled={isLoadingCredits}
+            >
+              <Wallet className="h-4 w-4" />
+              <span className="hidden sm:inline">Credits:</span>
+              {isLoadingCredits ? (
+                <span className="text-muted-foreground">--</span>
+              ) : (
                 <span className="text-primary">${credits.toFixed(2)}</span>
-              </Button>
-            )}
+              )}
+            </Button>
 
             <Button
               variant="ghost"
