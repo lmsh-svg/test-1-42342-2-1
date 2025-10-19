@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, cryptocurrency, amount, agreedToTerms } = body;
+    const { userId, cryptocurrency, agreedToTerms } = body;
 
     // Validate required fields
     if (!userId) {
@@ -97,13 +97,6 @@ export async function POST(request: NextRequest) {
     if (!cryptocurrency || typeof cryptocurrency !== 'string' || cryptocurrency.trim() === '') {
       return NextResponse.json(
         { error: 'Cryptocurrency is required and must be a non-empty string', code: 'MISSING_CRYPTOCURRENCY' },
-        { status: 400 }
-      );
-    }
-
-    if (!amount || typeof amount !== 'number' || amount <= 0) {
-      return NextResponse.json(
-        { error: 'Amount must be a positive number greater than 0', code: 'INVALID_AMOUNT' },
         { status: 400 }
       );
     }
@@ -184,8 +177,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate credits (1 USD = 1 credit)
-    const credits = amount;
+    // Amount will be auto-detected from blockchain, set to 0 initially
+    const amount = 0;
+    const credits = 0;
 
     // Create deposit
     const now = new Date().toISOString();

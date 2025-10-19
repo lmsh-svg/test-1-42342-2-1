@@ -72,7 +72,6 @@ export default function DepositsPage() {
     cooldownEndsAt: null,
     remainingMinutes: null
   });
-  const [btcPrice, setBtcPrice] = useState<number>(0);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -101,25 +100,6 @@ export default function DepositsPage() {
 
     return () => clearInterval(interval);
   }, [user, deposits]);
-
-  // Fetch BTC price on mount and refresh every 60 seconds
-  useEffect(() => {
-    const fetchBTCPrice = async () => {
-      try {
-        const res = await fetch('https://mempool.space/api/v1/prices');
-        if (res.ok) {
-          const prices = await res.json();
-          setBtcPrice(prices.USD || 0);
-        }
-      } catch (error) {
-        console.error('Failed to fetch BTC price:', error);
-      }
-    };
-    
-    fetchBTCPrice();
-    const interval = setInterval(fetchBTCPrice, 60000);
-    return () => clearInterval(interval);
-  }, []);
 
   const loadData = async () => {
     if (!user) return;
@@ -189,7 +169,6 @@ export default function DepositsPage() {
         body: JSON.stringify({
           userId: user.id,
           cryptocurrency: selectedCrypto,
-          amount: 0, // Amount will be auto-detected from blockchain
           agreedToTerms: true,
         }),
       });
@@ -428,22 +407,6 @@ export default function DepositsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* BTC Price Display */}
-                {btcPrice > 0 && (
-                  <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-primary" />
-                        <span className="text-sm font-medium">Current BTC Price</span>
-                      </div>
-                      <span className="text-lg font-bold text-primary">
-                        ${btcPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">Updated every 60 seconds</p>
-                  </div>
-                )}
-
                 <div className="space-y-2">
                   <Label htmlFor="cryptocurrency">Cryptocurrency</Label>
                   <Select value={selectedCrypto} onValueChange={setSelectedCrypto} disabled={cooldownStatus.hasCooldown}>
@@ -492,7 +455,7 @@ export default function DepositsPage() {
                   ) : (
                     <>
                       <ArrowDownToLine className="mr-2 h-4 w-4" />
-                      Create Deposit Address
+                      Create Deposit
                     </>
                   )}
                 </Button>
