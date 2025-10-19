@@ -14,6 +14,17 @@ export function ShippingWidget() {
   const [nextShippingDate, setNextShippingDate] = useState('');
   const [daysUntilShipping, setDaysUntilShipping] = useState(0);
   const [showInfo, setShowInfo] = useState(false);
+  const [showAlternateMessage, setShowAlternateMessage] = useState(false);
+
+  // Rotate between countdown timer and alternate message
+  useEffect(() => {
+    // Show timer for 15 seconds, then alternate message for 3 seconds
+    const rotationInterval = setInterval(() => {
+      setShowAlternateMessage(prev => !prev);
+    }, showAlternateMessage ? 3000 : 15000);
+
+    return () => clearInterval(rotationInterval);
+  }, [showAlternateMessage]);
 
   useEffect(() => {
     const updateTimer = () => {
@@ -89,12 +100,12 @@ export function ShippingWidget() {
     
     // Calculated holidays for 2025
     if (year === 2025) {
-      holidays.set(`${year}-01-20`, "Martin Luther King Jr. Day"); // 3rd Monday of January
-      holidays.set(`${year}-02-17`, "Presidents' Day"); // 3rd Monday of February
-      holidays.set(`${year}-05-26`, "Memorial Day"); // Last Monday of May
-      holidays.set(`${year}-09-01`, "Labor Day"); // 1st Monday of September
-      holidays.set(`${year}-10-13`, "Columbus Day"); // 2nd Monday of October
-      holidays.set(`${year}-11-27`, "Thanksgiving"); // 4th Thursday of November
+      holidays.set(`${year}-01-20`, "Martin Luther King Jr. Day");
+      holidays.set(`${year}-02-17`, "Presidents' Day");
+      holidays.set(`${year}-05-26`, "Memorial Day");
+      holidays.set(`${year}-09-01`, "Labor Day");
+      holidays.set(`${year}-10-13`, "Columbus Day");
+      holidays.set(`${year}-11-27`, "Thanksgiving");
     }
     
     // Calculated holidays for 2026
@@ -162,9 +173,9 @@ export function ShippingWidget() {
                     <span className="text-destructive font-medium">
                       USPS Closed ({holidayName}) - Ships {nextShippingDate}
                     </span>
-                  ) : daysUntilShipping > 1 ? (
-                    <span className="text-yellow-600 font-medium">
-                      Ships within {daysUntilShipping} business days
+                  ) : showAlternateMessage ? (
+                    <span className="text-orange-600 dark:text-orange-500 font-medium">
+                      Ships within 4 business days
                     </span>
                   ) : (
                     <>
