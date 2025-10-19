@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ShoppingCart, Package, Minus, Plus, CheckCircle2, AlertCircle, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ShoppingCart, Package, Minus, Plus, CheckCircle2, AlertCircle, ChevronRight, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/use-auth';
 import { ProductReviews } from '@/components/marketplace/product-reviews';
@@ -45,6 +45,16 @@ interface Variant {
   createdAt: string;
 }
 
+interface BulkPricingRule {
+  id: number;
+  productId: number;
+  minQuantity: number;
+  discountType: string;
+  discountValue: number;
+  finalPrice: number | null;
+  createdAt: string;
+}
+
 interface ProductDetailProps {
   productId: string;
 }
@@ -55,6 +65,7 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, Variant>>({});
+  const [bulkPricingRules, setBulkPricingRules] = useState<BulkPricingRule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -78,6 +89,13 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
       if (productRes.ok) {
         const productData = await productRes.json();
         setProduct(productData);
+        
+        // Fetch bulk pricing rules
+        const bulkPricingRes = await fetch(`/api/admin/bulk-pricing?productId=${productId}`);
+        if (bulkPricingRes.ok) {
+          const bulkPricingData = await bulkPricingRes.json();
+          setBulkPricingRules(bulkPricingData);
+        }
         
         // Fetch product images
         const imagesRes = await fetch(`/api/admin/product-images?productId=${productId}`);
@@ -151,6 +169,86 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
     }
   };
 
+  const calculateBulkPrice = (basePrice: number, qty: number): { price: number; savings: number; appliedRule: BulkPricingRule | null } => {
+    if (bulkPricingRules.length === 0) {
+      return { price: basePrice, savings: 0, appliedRule: null };
+    }
+
+    // Find the highest applicable rule (highest minQuantity that's still <= qty)
+    const applicableRules = bulkPricingRules
+      .filter(rule => rule.minQuantity <= qty)
+      .sort((a, b) => b.minQuantity - a.minQuantity);
+
+    if (applicableRules.length === 0) {
+      return { price: basePrice, savings: 0, appliedRule: null };
+    }
+
+    const rule = applicableRules[0];
+    let discountedPrice = basePrice;
+
+    if (rule.finalPrice !== null) {
+      discountedPrice = rule.finalPrice;
+    } else if (rule.discountType === 'percentage') {
+      discountedPrice = basePrice * (1 - rule.discountValue / 100);
+    } else if (rule.discountType === 'fixed_amount') {
+      discountedPrice = Math.max(0, basePrice - rule.discountValue);
+    }
+
+    const savings = basePrice - discountedPrice;
+    return { price: discountedPrice, savings, appliedRule: rule };
+  };
+
+  const getCurrentPrice = () => {
+    if (!product) return 0;
+    const variantModifiers = Object.values(selectedVariants).reduce(
+      (sum, v) => sum + v.priceModifier, 
+      0
+    );
+    return product.price + variantModifiers;
+  };
+
+  const getFinalPrice = () => {
+    const basePrice = getCurrentPrice();
+    const { price } = calculateBulkPrice(basePrice, quantity);
+    return price;
+  };
+
+  const getTotalPrice = () => {
+    return getFinalPrice() * quantity;
+  };
+
+  const getSavingsInfo = () => {
+    const basePrice = getCurrentPrice();
+    const { savings, appliedRule } = calculateBulkPrice(basePrice, quantity);
+    return { savings, appliedRule };
+  };
+
+  const getNextTierInfo = () => {
+    const higherRules = bulkPricingRules
+      .filter(rule => rule.minQuantity > quantity)
+      .sort((a, b) => a.minQuantity - b.minQuantity);
+
+    if (higherRules.length === 0) return null;
+
+    const nextRule = higherRules[0];
+    const basePrice = getCurrentPrice();
+    
+    let nextTierPrice = basePrice;
+    if (nextRule.finalPrice !== null) {
+      nextTierPrice = nextRule.finalPrice;
+    } else if (nextRule.discountType === 'percentage') {
+      nextTierPrice = basePrice * (1 - nextRule.discountValue / 100);
+    } else if (nextRule.discountType === 'fixed_amount') {
+      nextTierPrice = Math.max(0, basePrice - nextRule.discountValue);
+    }
+
+    return {
+      minQuantity: nextRule.minQuantity,
+      pricePerUnit: nextTierPrice,
+      totalSavings: (basePrice - nextTierPrice) * nextRule.minQuantity,
+    };
+  };
+
   const addToCart = async () => {
     if (!product) {
       toast.error('Product data not loaded');
@@ -195,7 +293,7 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
         <div className="flex flex-col gap-1">
           <p className="font-semibold">Added to cart! 🎉</p>
           <p className="text-sm text-muted-foreground">
-            {quantity} × {product.name} (${(currentPrice * quantity).toFixed(2)})
+            {quantity} × {product.name} (${getTotalPrice().toFixed(2)})
           </p>
         </div>,
         {
@@ -215,15 +313,6 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
     } finally {
       setIsAddingToCart(false);
     }
-  };
-
-  const getCurrentPrice = () => {
-    if (!product) return 0;
-    const variantModifiers = Object.values(selectedVariants).reduce(
-      (sum, v) => sum + v.priceModifier, 
-      0
-    );
-    return product.price + variantModifiers;
   };
 
   const getAvailableStock = () => {
@@ -255,6 +344,10 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
   ].filter((url, index, self) => self.indexOf(url) === index);
 
   const currentPrice = getCurrentPrice();
+  const finalPrice = getFinalPrice();
+  const totalPrice = getTotalPrice();
+  const { savings, appliedRule } = getSavingsInfo();
+  const nextTierInfo = getNextTierInfo();
   const availableStock = getAvailableStock();
   const totalStock = getTotalStock();
   const hasVariants = variants.length > 0;
@@ -391,20 +484,91 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
             </div>
           </div>
 
-          {/* Price */}
+          {/* Price with Bulk Pricing */}
           <div className="border-b pb-6">
             <div className="flex items-baseline gap-3 mb-2">
               <span className="text-5xl font-bold text-foreground">
-                ${currentPrice.toFixed(2)}
+                ${finalPrice.toFixed(2)}
               </span>
-              {hasVariants && Object.values(selectedVariants).some(v => v.priceModifier !== 0) && (
+              {savings > 0 && (
                 <span className="text-lg text-muted-foreground line-through">
-                  ${product.price.toFixed(2)}
+                  ${currentPrice.toFixed(2)}
                 </span>
               )}
             </div>
+
+            {/* Bulk Pricing Savings Badge */}
+            {savings > 0 && appliedRule && (
+              <div className="mt-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <TrendingDown className="h-5 w-5" />
+                  <div>
+                    <p className="font-semibold">Bulk Discount Applied!</p>
+                    <p className="text-sm">Save ${savings.toFixed(2)} per unit (${(savings * quantity).toFixed(2)} total)</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Bulk Pricing Tiers Table */}
+            {bulkPricingRules.length > 0 && (
+              <div className="mt-4">
+                <h4 className="text-sm font-semibold mb-2">Volume Pricing</h4>
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="text-left p-2 font-medium">Quantity</th>
+                        <th className="text-right p-2 font-medium">Price/Unit</th>
+                        <th className="text-right p-2 font-medium">You Save</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bulkPricingRules
+                        .sort((a, b) => a.minQuantity - b.minQuantity)
+                        .map((rule) => {
+                          let rulePrice = currentPrice;
+                          if (rule.finalPrice !== null) {
+                            rulePrice = rule.finalPrice;
+                          } else if (rule.discountType === 'percentage') {
+                            rulePrice = currentPrice * (1 - rule.discountValue / 100);
+                          } else if (rule.discountType === 'fixed_amount') {
+                            rulePrice = Math.max(0, currentPrice - rule.discountValue);
+                          }
+                          const ruleSavings = currentPrice - rulePrice;
+                          const isActive = appliedRule?.id === rule.id;
+
+                          return (
+                            <tr 
+                              key={rule.id} 
+                              className={`border-t ${isActive ? 'bg-primary/5 font-medium' : ''}`}
+                            >
+                              <td className="p-2">{rule.minQuantity}+</td>
+                              <td className="text-right p-2">${rulePrice.toFixed(2)}</td>
+                              <td className="text-right p-2 text-green-600 dark:text-green-400">
+                                ${ruleSavings.toFixed(2)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Next Tier Incentive */}
+            {nextTierInfo && (
+              <div className="mt-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-semibold text-foreground">Buy {nextTierInfo.minQuantity}+ </span>
+                  and save ${nextTierInfo.totalSavings.toFixed(2)} 
+                  <span className="text-primary"> (${nextTierInfo.pricePerUnit.toFixed(2)}/unit)</span>
+                </p>
+              </div>
+            )}
             
-            {/* Price Breakdown */}
+            {/* Variant Price Breakdown */}
             {hasVariants && Object.values(selectedVariants).some(v => v.priceModifier !== 0) && (
               <div className="mt-3 space-y-1 text-sm">
                 {Object.entries(selectedVariants).map(([type, variant]) => 
@@ -558,7 +722,12 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
               ) : (
                 <>
                   <ShoppingCart className="h-5 w-5 mr-2" />
-                  Add to Cart - ${(currentPrice * quantity).toFixed(2)}
+                  Add to Cart - ${totalPrice.toFixed(2)}
+                  {savings > 0 && (
+                    <span className="ml-2 text-sm opacity-90">
+                      (Save ${(savings * quantity).toFixed(2)})
+                    </span>
+                  )}
                 </>
               )}
             </Button>

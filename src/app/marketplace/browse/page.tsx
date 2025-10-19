@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -43,6 +43,7 @@ interface Product {
 
 export default function BrowsePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,6 +56,14 @@ export default function BrowsePage() {
   const [sortBy, setSortBy] = useState('newest');
 
   const userHasLocalAccess = user?.role === 'admin';
+
+  useEffect(() => {
+    // Read brand from URL params on mount
+    const brandFromUrl = searchParams.get('brand');
+    if (brandFromUrl && !selectedBrands.includes(brandFromUrl)) {
+      setSelectedBrands([brandFromUrl]);
+    }
+  }, []);
 
   useEffect(() => {
     fetchProducts();

@@ -97,6 +97,10 @@ export default function MarketplacePage() {
     router.push(`/marketplace/product/${productId}`);
   };
 
+  const handleBrandClick = (brand: string) => {
+    router.push(`/marketplace/browse?brand=${encodeURIComponent(brand)}`);
+  };
+
   const getTotalStock = (product: Product) => {
     return product.stockQuantity + product.totalVariantsStock;
   };
@@ -157,15 +161,23 @@ export default function MarketplacePage() {
               </div>
             )}
             {!userProfile?.storeName && (
-              <div className="flex items-center justify-center gap-3 mb-4">
-                <Sparkles className="h-12 w-12 text-primary" />
-                <h1 className="text-5xl font-bold text-foreground">
-                  Welcome to the Marketplace
-                </h1>
+              <div className="mb-4">
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <Sparkles className="h-8 w-8 text-primary animate-pulse" />
+                  <h1 className="text-5xl font-bold bg-gradient-to-r from-primary via-primary/80 to-primary bg-clip-text text-transparent">
+                    Premium Quality
+                  </h1>
+                  <Sparkles className="h-8 w-8 text-primary animate-pulse" />
+                </div>
+                <p className="text-3xl font-semibold text-foreground mb-2">
+                  Delivered to Your Door
+                </p>
               </div>
             )}
             <p className="text-xl text-muted-foreground mb-8">
-              Discover premium products with fast, reliable shipping
+              {userProfile?.storeName 
+                ? 'Discover premium products with fast, reliable shipping' 
+                : 'Shop the finest selection • Fast shipping • Secure checkout'}
             </p>
             <Button 
               size="lg" 
@@ -311,7 +323,7 @@ export default function MarketplacePage() {
                     key={index}
                     variant="outline" 
                     className="px-6 py-3 text-base cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
-                    onClick={() => router.push('/marketplace/browse')}
+                    onClick={() => handleBrandClick(brand)}
                   >
                     {brand}
                   </Badge>

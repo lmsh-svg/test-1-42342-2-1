@@ -244,3 +244,18 @@ export const incomingVerifications = sqliteTable('incoming_verifications', {
 }, (table) => ({
   uniqueTxidCurrency: unique('unique_txid_currency').on(table.txid, table.currency),
 }));
+
+export const manualCredits = sqliteTable('manual_credits', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  adminId: integer('admin_id').notNull().references(() => users.id),
+  userId: integer('user_id').notNull().references(() => users.id),
+  amount: real('amount').notNull(),
+  creditType: text('credit_type').notNull(),
+  transactionId: text('transaction_id'),
+  referenceNumber: text('reference_number'),
+  notes: text('notes').notNull(),
+  verified: integer('verified', { mode: 'boolean' }).default(false).notNull(),
+  createdAt: text('created_at').notNull(),
+}, (table) => ({
+  uniqueTransactionId: unique('unique_transaction_id').on(table.transactionId),
+}));
