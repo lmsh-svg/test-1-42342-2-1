@@ -259,3 +259,16 @@ export const manualCredits = sqliteTable('manual_credits', {
 }, (table) => ({
   uniqueTransactionId: unique('unique_transaction_id').on(table.transactionId),
 }));
+
+export const markups = sqliteTable('markups', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  type: text('type').notNull(),
+  targetId: text('target_id'),
+  markupType: text('markup_type').notNull(),
+  markupValue: real('markup_value').notNull(),
+  isActive: integer('is_active', { mode: 'boolean' }).default(true),
+  priority: integer('priority').default(0),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});

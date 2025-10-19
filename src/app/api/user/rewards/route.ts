@@ -5,17 +5,17 @@ import { eq } from 'drizzle-orm';
 
 // Tier thresholds and cashback rates
 const TIER_THRESHOLDS = {
-  bronze: { min: 0, max: 999, cashbackRate: 0 },
-  silver: { min: 1000, max: 4999, cashbackRate: 2 },
-  gold: { min: 5000, max: 9999, cashbackRate: 5 },
-  platinum: { min: 10000, max: Infinity, cashbackRate: 10 }
+  bronze: { min: 0, max: 999, cashbackRate: 0.5 },
+  silver: { min: 1000, max: 4999, cashbackRate: 1 },
+  gold: { min: 5000, max: 9999, cashbackRate: 2 },
+  platinum: { min: 10000, max: Infinity, cashbackRate: 3 }
 };
 
 const TIER_DESCRIPTIONS = {
-  bronze: "Start earning rewards! Spend $1,000 to unlock 2% cashback.",
-  silver: "2% cashback on all purchases. Spend $5,000 to unlock 5% cashback.",
-  gold: "5% cashback on all purchases. Spend $10,000 to unlock 10% cashback.",
-  platinum: "Maximum 10% cashback on all purchases! Elite status achieved."
+  bronze: "Start earning rewards! Spend $1,000 to unlock 1% cashback.",
+  silver: "1% cashback on all purchases. Spend $5,000 to unlock 2% cashback.",
+  gold: "2% cashback on all purchases. Spend $10,000 to unlock 3% cashback.",
+  platinum: "Maximum 3% cashback on all purchases! Elite status achieved."
 };
 
 type TierName = 'bronze' | 'silver' | 'gold' | 'platinum';

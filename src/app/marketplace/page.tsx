@@ -148,45 +148,60 @@ export default function MarketplacePage() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 py-8">
-          {/* Hero Section */}
-          <div className="mb-12 text-center">
+          {/* Hero Section - Redesigned */}
+          <div className="mb-8 sm:mb-12">
             {userProfile?.storeName && (
-              <div className="flex items-center justify-center gap-3 mb-4">
-                {userProfile?.storeLogo && (
-                  <img src={userProfile.storeLogo} alt="Store logo" className="h-12 w-12 object-contain" />
-                )}
-                <h1 className="text-5xl font-bold text-foreground">
-                  {userProfile.storeName}
-                </h1>
-              </div>
-            )}
-            {!userProfile?.storeName && (
-              <div className="mb-4">
-                <div className="flex items-center justify-center gap-2 mb-3">
-                  <Sparkles className="h-8 w-8 text-primary animate-pulse" />
-                  <h1 className="text-5xl font-bold bg-gradient-to-r from-primary via-primary/80 to-primary bg-clip-text text-transparent">
-                    Premium Quality
+              <div className="text-center mb-6">
+                <div className="flex items-center justify-center gap-3 mb-4">
+                  {userProfile?.storeLogo && (
+                    <img src={userProfile.storeLogo} alt="Store logo" className="h-12 w-12 object-contain" />
+                  )}
+                  <h1 className="text-3xl sm:text-5xl font-bold text-foreground">
+                    {userProfile.storeName}
                   </h1>
-                  <Sparkles className="h-8 w-8 text-primary animate-pulse" />
                 </div>
-                <p className="text-3xl font-semibold text-foreground mb-2">
-                  Delivered to Your Door
+                <p className="text-base sm:text-xl text-muted-foreground">
+                  Discover premium products with fast, reliable shipping
                 </p>
               </div>
             )}
-            <p className="text-xl text-muted-foreground mb-8">
-              {userProfile?.storeName 
-                ? 'Discover premium products with fast, reliable shipping' 
-                : 'Shop the finest selection • Fast shipping • Secure checkout'}
-            </p>
-            <Button 
-              size="lg" 
-              onClick={() => router.push('/marketplace/browse')}
-              className="gap-2"
-            >
-              Browse All Products
-              <ChevronRight className="h-5 w-5" />
-            </Button>
+            {!userProfile?.storeName && (
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-background border border-primary/20 p-6 sm:p-8">
+                <div className="absolute inset-0 bg-grid-white/5 [mask-image:linear-gradient(0deg,transparent,black)]" />
+                <div className="relative z-10 text-center space-y-3 sm:space-y-4">
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-xs sm:text-sm font-medium text-primary">
+                    <Sparkles className="h-3 w-3 sm:h-4 sm:w-4" />
+                    Shop Smart, Save More
+                  </div>
+                  <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-foreground">
+                    Your Marketplace for
+                    <span className="block text-primary mt-1">Premium Products</span>
+                  </h1>
+                  <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto">
+                    Exclusive deals • Bulk discounts • Reward points on every purchase
+                  </p>
+                </div>
+              </div>
+            )}
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Button 
+                size="lg" 
+                onClick={() => router.push('/marketplace/browse')}
+                className="gap-2 w-full sm:w-auto"
+              >
+                Browse All Products
+                <ChevronRight className="h-5 w-5" />
+              </Button>
+              <Button 
+                size="lg"
+                variant="outline"
+                onClick={() => router.push('/marketplace/rewards')}
+                className="gap-2 w-full sm:w-auto"
+              >
+                <Award className="h-5 w-5" />
+                View Rewards
+              </Button>
+            </div>
           </div>
 
           {/* Featured Products Section */}
@@ -354,10 +369,10 @@ export default function MarketplacePage() {
                     size="lg"
                     variant="outline" 
                     onClick={() => router.push('/marketplace/rewards')}
-                    className="gap-2 w-full sm:w-auto"
+                    className="gap-2 w-full sm:w-auto shrink-0"
                   >
-                    <Award className="h-5 w-5" />
-                    View Rewards
+                    <Award className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="truncate">View Rewards</span>
                   </Button>
                 </div>
                 

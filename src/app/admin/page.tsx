@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { AdminTabs } from '@/components/admin/admin-tabs';
-import { Loader2, Wallet, Users, Package, Coins, TicketCheck, Store, Settings, Database, DollarSign, ShoppingCart, Clock, TrendingUp, AlertTriangle, Activity, Eye, Archive, CheckCircle, CreditCard } from 'lucide-react';
+import { Loader2, Wallet, Users, Package, Coins, TicketCheck, Store, Settings, Database, DollarSign, ShoppingCart, Clock, TrendingUp, AlertTriangle, Activity, Eye, Archive, CheckCircle, CreditCard, Percent } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -149,6 +149,7 @@ export default function AdminDashboard() {
     { title: 'Crypto Addresses', icon: Wallet, href: '/admin/crypto-addresses', color: 'text-orange-500' },
     { title: 'Verifications', icon: CheckCircle, href: '/admin/verifications', color: 'text-emerald-500' },
     { title: 'Support Tickets', icon: TicketCheck, href: '/admin/tickets', color: 'text-pink-500' },
+    { title: 'Markups', icon: Percent, href: '/admin/markups', color: 'text-teal-500' },
     { title: 'API Management', icon: Settings, href: '/admin/api-management', color: 'text-gray-500' },
   ];
 

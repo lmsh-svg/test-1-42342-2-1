@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Search, ShoppingCart, Filter, Package, SlidersHorizontal, Globe, MapPin, ChevronDown, Gift } from 'lucide-react';
+import { Search, ShoppingCart, Filter, Package, SlidersHorizontal, Globe, MapPin, ChevronDown, Gift, TrendingDown } from 'lucide-react';
 import FiltersPanel from '@/components/marketplace/filters-panel';
 import Navbar from '@/components/marketplace/navbar';
 import { ShippingWidget } from '@/components/marketplace/shipping-widget';
@@ -41,11 +41,21 @@ interface Product {
   totalVariantsStock: number;
 }
 
+interface BulkPricingRule {
+  id: number;
+  productId: number;
+  minQuantity: number;
+  discountType: string;
+  discountValue: number;
+  finalPrice: number | null;
+}
+
 export default function BrowsePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
+  const [bulkPricing, setBulkPricing] = useState<Record<number, BulkPricingRule[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -107,6 +117,8 @@ export default function BrowsePage() {
       
       if (response.ok) {
         setProducts(data);
+        // Fetch bulk pricing for all products
+        fetchBulkPricing(data.map((p: Product) => p.id));
       } else {
         console.error('Failed to fetch products:', data);
         setProducts([]);
@@ -117,6 +129,55 @@ export default function BrowsePage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const fetchBulkPricing = async (productIds: number[]) => {
+    try {
+      const bulkPricingData: Record<number, BulkPricingRule[]> = {};
+      
+      // Fetch bulk pricing for each product
+      await Promise.all(
+        productIds.map(async (productId) => {
+          try {
+            const response = await fetch(`/api/admin/bulk-pricing?productId=${productId}`);
+            if (response.ok) {
+              const rules = await response.json();
+              if (rules.length > 0) {
+                bulkPricingData[productId] = rules;
+              }
+            }
+          } catch (error) {
+            console.error(`Failed to fetch bulk pricing for product ${productId}:`, error);
+          }
+        })
+      );
+      
+      setBulkPricing(bulkPricingData);
+    } catch (error) {
+      console.error('Failed to fetch bulk pricing:', error);
+    }
+  };
+
+  const getLowestBulkPrice = (productId: number, basePrice: number) => {
+    const rules = bulkPricing[productId];
+    if (!rules || rules.length === 0) return null;
+    
+    // Find the lowest price from bulk pricing rules
+    const lowestRule = rules.reduce((lowest, rule) => {
+      const rulePrice = rule.finalPrice || basePrice - (rule.discountType === 'percentage' 
+        ? (basePrice * rule.discountValue / 100)
+        : rule.discountValue);
+      
+      const lowestPrice = lowest.finalPrice || basePrice - (lowest.discountType === 'percentage'
+        ? (basePrice * lowest.discountValue / 100)
+        : lowest.discountValue);
+      
+      return rulePrice < lowestPrice ? rule : lowest;
+    }, rules[0]);
+    
+    return lowestRule.finalPrice || basePrice - (lowestRule.discountType === 'percentage'
+      ? (basePrice * lowestRule.discountValue / 100)
+      : lowestRule.discountValue);
   };
 
   const filteredProducts = products
@@ -287,6 +348,8 @@ export default function BrowsePage() {
               {filteredProducts.map((product) => {
                 const totalStock = getTotalStock(product);
                 const isLowStock = totalStock < 10 && totalStock > 0;
+                const lowestBulkPrice = getLowestBulkPrice(product.id, product.price);
+                const hasBulkPricing = bulkPricing[product.id] && bulkPricing[product.id].length > 0;
                 
                 return (
                   <Card 
@@ -321,6 +384,13 @@ export default function BrowsePage() {
                         </Badge>
                       )}
                       
+                      {hasBulkPricing && (
+                        <Badge className="absolute bottom-1.5 left-1.5 text-xs bg-green-500/90 backdrop-blur-sm flex items-center gap-1">
+                          <TrendingDown className="h-3 w-3" />
+                          Bulk
+                        </Badge>
+                      )}
+                      
                       {totalStock === 0 && (
                         <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center">
                           <Badge variant="destructive" className="text-xs">Out of Stock</Badge>
@@ -342,9 +412,22 @@ export default function BrowsePage() {
                       )}
                       
                       <div className="flex items-center justify-between pt-1.5">
-                        <span className="text-lg font-bold text-foreground">
-                          ${product.price.toFixed(2)}
-                        </span>
+                        <div className="flex flex-col">
+                          {lowestBulkPrice && lowestBulkPrice < product.price ? (
+                            <>
+                              <span className="text-xs text-muted-foreground line-through">
+                                ${product.price.toFixed(2)}
+                              </span>
+                              <span className="text-lg font-bold text-green-600">
+                                From ${lowestBulkPrice.toFixed(2)}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-lg font-bold text-foreground">
+                              ${product.price.toFixed(2)}
+                            </span>
+                          )}
+                        </div>
                         <Button 
                           size="sm" 
                           onClick={(e) => {
