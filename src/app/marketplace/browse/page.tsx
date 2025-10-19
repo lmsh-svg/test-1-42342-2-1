@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Search, ShoppingCart, Filter, Package, SlidersHorizontal, Globe, MapPin } from 'lucide-react';
+import { Search, ShoppingCart, Filter, Package, SlidersHorizontal, Globe, MapPin, ChevronDown } from 'lucide-react';
 import FiltersPanel from '@/components/marketplace/filters-panel';
 import Navbar from '@/components/marketplace/navbar';
 import { ShippingWidget } from '@/components/marketplace/shipping-widget';
@@ -168,7 +168,7 @@ export default function BrowsePage() {
                   className="gap-2"
                 >
                   <Globe className="h-4 w-4" />
-                  Online
+                  <span className="hidden sm:inline">Online</span>
                 </Button>
                 <Button
                   variant={showLocalOnly ? "default" : "ghost"}
@@ -177,7 +177,7 @@ export default function BrowsePage() {
                   className="gap-2"
                 >
                   <MapPin className="h-4 w-4" />
-                  Local
+                  <span className="hidden sm:inline">Local</span>
                 </Button>
               </div>
             )}
@@ -195,7 +195,7 @@ export default function BrowsePage() {
             </div>
           </div>
 
-          <div className="mb-6">
+          <div className="mb-6 hidden lg:block">
             <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
               <TabsList className="w-full justify-start overflow-x-auto bg-card/50 border border-border/50 backdrop-blur p-1">
                 <TabsTrigger value="all" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
@@ -214,13 +214,31 @@ export default function BrowsePage() {
             </Tabs>
           </div>
 
+          <div className="mb-6 lg:hidden">
+            <div className="relative">
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full h-12 px-4 pr-10 rounded-lg border border-border/50 bg-card/50 text-base backdrop-blur focus:outline-none focus:ring-2 focus:ring-primary appearance-none"
+              >
+                <option value="all">All Products</option>
+                {MAIN_CATEGORIES.map(category => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
+            </div>
+          </div>
+
           <div className="flex items-center justify-between mb-6 gap-4">
             <div className="flex items-center gap-3">
               <Sheet>
                 <SheetTrigger asChild>
                   <Button variant="outline" className="gap-2 bg-card/50 border-border/50 backdrop-blur">
                     <SlidersHorizontal className="h-4 w-4" />
-                    Filters
+                    <span className="hidden sm:inline">Filters</span>
                     {activeFiltersCount > 0 && (
                       <Badge variant="secondary" className="ml-1">{activeFiltersCount}</Badge>
                     )}
@@ -253,7 +271,7 @@ export default function BrowsePage() {
               </select>
             </div>
 
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-muted-foreground hidden sm:block">
               Showing {filteredProducts.length} products
             </div>
           </div>
