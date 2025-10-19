@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, type, targetId, markupType, markupValue, isActive, priority } = body;
+    const { name, type, targetId, markupType, markupValue, isActive, priority, startDate, endDate, compoundStrategy } = body;
 
     // Validation: name must be non-empty string
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -131,6 +131,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validation: compoundStrategy must be valid
+    if (compoundStrategy !== undefined && !['replace', 'add', 'multiply'].includes(compoundStrategy)) {
+      return NextResponse.json(
+        { error: 'Compound strategy must be one of: replace, add, multiply', code: 'INVALID_COMPOUND_STRATEGY' },
+        { status: 400 }
+      );
+    }
+
+    // Validation: date fields
+    if (startDate !== undefined && startDate !== null && startDate !== '') {
+      const startDateObj = new Date(startDate);
+      if (isNaN(startDateObj.getTime())) {
+        return NextResponse.json(
+          { error: 'Start date must be a valid ISO date string', code: 'INVALID_START_DATE' },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (endDate !== undefined && endDate !== null && endDate !== '') {
+      const endDateObj = new Date(endDate);
+      if (isNaN(endDateObj.getTime())) {
+        return NextResponse.json(
+          { error: 'End date must be a valid ISO date string', code: 'INVALID_END_DATE' },
+          { status: 400 }
+        );
+      }
+
+      // Validate end date is after start date if both provided
+      if (startDate) {
+        const startDateObj = new Date(startDate);
+        if (endDateObj <= startDateObj) {
+          return NextResponse.json(
+            { error: 'End date must be after start date', code: 'INVALID_DATE_RANGE' },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     // Validation: Site-wide active constraint
     const isActiveValue = isActive !== undefined ? isActive : true;
     if (type === 'site_wide' && isActiveValue === true) {
@@ -158,6 +198,9 @@ export async function POST(request: NextRequest) {
       markupValue,
       isActive: isActiveValue,
       priority: priority !== undefined ? priority : 0,
+      startDate: startDate || null,
+      endDate: endDate || null,
+      compoundStrategy: compoundStrategy || 'replace',
       createdAt: now,
       updatedAt: now,
     };
@@ -201,7 +244,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, type, targetId, markupType, markupValue, isActive, priority } = body;
+    const { name, type, targetId, markupType, markupValue, isActive, priority, startDate, endDate, compoundStrategy } = body;
 
     const updates: any = {};
 
@@ -291,7 +334,61 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Validation: Site-wide active constraint
+    // Validation: compoundStrategy
+    if (compoundStrategy !== undefined) {
+      if (!['replace', 'add', 'multiply'].includes(compoundStrategy)) {
+        return NextResponse.json(
+          { error: 'Compound strategy must be one of: replace, add, multiply', code: 'INVALID_COMPOUND_STRATEGY' },
+          { status: 400 }
+        );
+      }
+      updates.compoundStrategy = compoundStrategy;
+    }
+
+    // Validation: date fields
+    if (startDate !== undefined) {
+      if (startDate === null || startDate === '') {
+        updates.startDate = null;
+      } else {
+        const startDateObj = new Date(startDate);
+        if (isNaN(startDateObj.getTime())) {
+          return NextResponse.json(
+            { error: 'Start date must be a valid ISO date string', code: 'INVALID_START_DATE' },
+            { status: 400 }
+          );
+        }
+        updates.startDate = startDate;
+      }
+    }
+
+    if (endDate !== undefined) {
+      if (endDate === null || endDate === '') {
+        updates.endDate = null;
+      } else {
+        const endDateObj = new Date(endDate);
+        if (isNaN(endDateObj.getTime())) {
+          return NextResponse.json(
+            { error: 'End date must be a valid ISO date string', code: 'INVALID_END_DATE' },
+            { status: 400 }
+          );
+        }
+
+        // Validate end date is after start date
+        const finalStartDate = updates.startDate !== undefined ? updates.startDate : existing[0].startDate;
+        if (finalStartDate) {
+          const startDateObj = new Date(finalStartDate);
+          if (endDateObj <= startDateObj) {
+            return NextResponse.json(
+              { error: 'End date must be after start date', code: 'INVALID_DATE_RANGE' },
+              { status: 400 }
+            );
+          }
+        }
+        updates.endDate = endDate;
+      }
+    }
+
+    // Validation: isActive
     if (isActive !== undefined) {
       updates.isActive = isActive;
     }

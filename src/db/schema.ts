@@ -269,6 +269,18 @@ export const markups = sqliteTable('markups', {
   markupValue: real('markup_value').notNull(),
   isActive: integer('is_active', { mode: 'boolean' }).default(true),
   priority: integer('priority').default(0),
+  startDate: text('start_date'),
+  endDate: text('end_date'),
+  compoundStrategy: text('compound_strategy').notNull().default('replace'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
+});
+
+export const markupTiers = sqliteTable('markup_tiers', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  markupId: integer('markup_id').notNull().references(() => markups.id),
+  minQuantity: integer('min_quantity').notNull(),
+  maxQuantity: integer('max_quantity'),
+  markupValue: real('markup_value').notNull(),
+  createdAt: text('created_at').notNull(),
 });

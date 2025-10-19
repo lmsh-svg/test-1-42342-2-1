@@ -69,6 +69,15 @@ interface MarkupCalculation {
   }[];
 }
 
+interface PricingTier {
+  quantity: string; // e.g., "1+", "3+", "5+"
+  minQuantity: number;
+  pricePerUnit: number;
+  totalPrice: number;
+  savings: number;
+  isActive: boolean;
+}
+
 interface ProductDetailProps {
   productId: string;
 }
@@ -86,11 +95,55 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [thumbnailStartIndex, setThumbnailStartIndex] = useState(0);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [pricingTiers, setPricingTiers] = useState<PricingTier[]>([]);
+  const [selectedTierQuantity, setSelectedTierQuantity] = useState<number>(1);
   const { user } = useAuth();
 
   useEffect(() => {
     fetchProductData();
   }, [productId]);
+
+  useEffect(() => {
+    // Recalculate pricing tiers whenever markup or bulk pricing changes
+    if (product) {
+      calculatePricingTiers();
+    }
+  }, [product, markupCalculation, bulkPricingRules, selectedVariants]);
+
+  const calculatePricingTiers = () => {
+    if (!product) return;
+
+    const basePrice = markupCalculation?.finalPrice || product.price;
+    const variantModifiers = Object.values(selectedVariants).reduce(
+      (sum, v) => sum + v.priceModifier, 
+      0
+    );
+    const baseWithVariants = basePrice + variantModifiers;
+
+    // Get all unique quantity breakpoints from bulk pricing rules
+    const quantityBreakpoints = [1];
+    bulkPricingRules.forEach(rule => {
+      if (!quantityBreakpoints.includes(rule.minQuantity)) {
+        quantityBreakpoints.push(rule.minQuantity);
+      }
+    });
+    quantityBreakpoints.sort((a, b) => a - b);
+
+    const tiers: PricingTier[] = quantityBreakpoints.map(minQty => {
+      const { price: unitPrice } = calculateBulkPrice(baseWithVariants, minQty);
+      
+      return {
+        quantity: `${minQty}+`,
+        minQuantity: minQty,
+        pricePerUnit: unitPrice,
+        totalPrice: unitPrice * minQty,
+        savings: (baseWithVariants - unitPrice) * minQty,
+        isActive: quantity >= minQty
+      };
+    });
+
+    setPricingTiers(tiers);
+  };
 
   const fetchProductData = async () => {
     try {
@@ -195,6 +248,12 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
         [type]: variant
       }));
     }
+  };
+
+  const handleTierChange = (tierQty: string) => {
+    const minQty = parseInt(tierQty);
+    setSelectedTierQuantity(minQty);
+    setQuantity(minQty);
   };
 
   const getBasePrice = () => {
@@ -543,13 +602,100 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
               </div>
             )}
 
+            {/* PRICING TIERS SELECTOR - NEW */}
+            {pricingTiers.length > 1 && (
+              <div className="mb-4 space-y-3">
+                <h4 className="text-sm font-semibold flex items-center gap-2">
+                  <TrendingDown className="h-4 w-4 text-green-600" />
+                  Volume Pricing - Select Quantity Tier
+                </h4>
+                
+                <Select 
+                  value={selectedTierQuantity.toString()} 
+                  onValueChange={handleTierChange}
+                >
+                  <SelectTrigger className="h-12 border-2">
+                    <SelectValue>
+                      <div className="flex items-center justify-between w-full">
+                        <span className="font-medium">{selectedTierQuantity}+ Units</span>
+                        <span className="text-primary font-bold">
+                          ${pricingTiers.find(t => t.minQuantity === selectedTierQuantity)?.pricePerUnit.toFixed(2)}/unit
+                        </span>
+                      </div>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pricingTiers.map((tier) => (
+                      <SelectItem 
+                        key={tier.minQuantity} 
+                        value={tier.minQuantity.toString()}
+                        className="py-3"
+                      >
+                        <div className="flex items-center justify-between w-full gap-4">
+                          <div className="flex flex-col">
+                            <span className="font-semibold">{tier.quantity}</span>
+                            {tier.savings > 0 && (
+                              <span className="text-xs text-green-600">
+                                Save ${tier.savings.toFixed(2)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold text-primary">
+                              ${tier.pricePerUnit.toFixed(2)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              per unit
+                            </div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Pricing Tiers Table */}
+                <div className="mt-3 border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="text-left p-2 font-medium">Quantity</th>
+                        <th className="text-right p-2 font-medium">Price/Unit</th>
+                        <th className="text-right p-2 font-medium">You Save</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pricingTiers.map((tier) => (
+                        <tr 
+                          key={tier.minQuantity}
+                          className={`border-t cursor-pointer hover:bg-muted/30 ${
+                            tier.minQuantity === selectedTierQuantity ? 'bg-primary/5 font-medium' : ''
+                          }`}
+                          onClick={() => handleTierChange(tier.minQuantity.toString())}
+                        >
+                          <td className="p-2">{tier.quantity}</td>
+                          <td className="text-right p-2 font-semibold text-primary">
+                            ${tier.pricePerUnit.toFixed(2)}
+                          </td>
+                          <td className="text-right p-2 text-green-600">
+                            {tier.savings > 0 ? `$${tier.savings.toFixed(2)}` : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Current Price Display */}
             <div className="flex items-baseline gap-3 mb-2">
               <span className="text-5xl font-bold text-foreground">
-                ${finalPrice.toFixed(2)}
+                ${getFinalPrice().toFixed(2)}
               </span>
               {savings > 0 && (
                 <span className="text-lg text-muted-foreground line-through">
-                  ${currentPrice.toFixed(2)}
+                  ${getCurrentPrice().toFixed(2)}
                 </span>
               )}
             </div>

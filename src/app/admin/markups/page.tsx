@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Plus, Edit, Trash2, TrendingUp, TrendingDown, Tag, Package, Globe, Eye, Calculator } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, TrendingUp, TrendingDown, Tag, Package, Globe, Eye, Calculator, Layers, X } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
 
@@ -23,8 +23,20 @@ interface Markup {
   markupValue: number;
   isActive: boolean;
   priority: number;
+  startDate: string | null;
+  endDate: string | null;
+  compoundStrategy: 'replace' | 'add' | 'multiply';
   createdAt: string;
   updatedAt: string;
+}
+
+interface MarkupTier {
+  id?: number;
+  markupId?: number;
+  minQuantity: number;
+  maxQuantity: number | null;
+  markupValue: number;
+  createdAt?: string;
 }
 
 interface Product {
@@ -64,14 +76,10 @@ export default function AdminMarkupsPage() {
   const [markupPreviews, setMarkupPreviews] = useState<MarkupPreview[]>([]);
   const [previewCategory, setPreviewCategory] = useState<string>('all');
   const [previewLimit, setPreviewLimit] = useState<number>(10);
-  const [formData, setFormData] = useState({
-    name: '',
-    type: 'category' as 'site_wide' | 'category' | 'product',
-    targetId: '',
-    markupType: 'percentage' as 'percentage' | 'fixed_amount',
-    markupValue: 0,
-    priority: 0,
-  });
+  const [markupTiers, setMarkupTiers] = useState<Record<number, MarkupTier[]>>({});
+  const [editingTiers, setEditingTiers] = useState<MarkupTier[]>([]);
+  const [showTierDialog, setShowTierDialog] = useState(false);
+  const [selectedMarkupForTiers, setSelectedMarkupForTiers] = useState<Markup | null>(null);
 
   useEffect(() => {
     if (!isLoading && user?.role !== 'admin') {
@@ -115,6 +123,25 @@ export default function AdminMarkupsPage() {
       console.error('Failed to fetch products:', error);
     }
   };
+
+  const fetchMarkupTiers = async (markupId: number) => {
+    try {
+      const response = await fetch(`/api/admin/markup-tiers?markupId=${markupId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setMarkupTiers(prev => ({ ...prev, [markupId]: data }));
+      }
+    } catch (error) {
+      console.error(`Failed to fetch tiers for markup ${markupId}:`, error);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.role === 'admin' && markups.length > 0) {
+      // Fetch tiers for all markups
+      markups.forEach(markup => fetchMarkupTiers(markup.id));
+    }
+  }, [markups, user]);
 
   const generatePreview = async () => {
     setIsLoadingPreview(true);
@@ -174,6 +201,9 @@ export default function AdminMarkupsPage() {
         markupType: markup.markupType,
         markupValue: markup.markupValue,
         priority: markup.priority,
+        startDate: markup.startDate || '',
+        endDate: markup.endDate || '',
+        compoundStrategy: markup.compoundStrategy || 'replace',
       });
     } else {
       setEditingMarkup(null);
@@ -184,6 +214,9 @@ export default function AdminMarkupsPage() {
         markupType: 'percentage',
         markupValue: 0,
         priority: 0,
+        startDate: '',
+        endDate: '',
+        compoundStrategy: 'replace',
       });
     }
     setShowDialog(true);
@@ -193,6 +226,85 @@ export default function AdminMarkupsPage() {
     setShowDialog(false);
     setEditingMarkup(null);
   };
+
+  const handleOpenTierDialog = (markup: Markup) => {
+    setSelectedMarkupForTiers(markup);
+    const existingTiers = markupTiers[markup.id] || [];
+    setEditingTiers(existingTiers.length > 0 ? [...existingTiers] : [
+      { minQuantity: 1, maxQuantity: 10, markupValue: markup.markupValue }
+    ]);
+    setShowTierDialog(true);
+  };
+
+  const addTierRow = () => {
+    const lastTier = editingTiers[editingTiers.length - 1];
+    const newMinQty = lastTier ? (lastTier.maxQuantity || lastTier.minQuantity) + 1 : 1;
+    
+    setEditingTiers([...editingTiers, {
+      minQuantity: newMinQty,
+      maxQuantity: null,
+      markupValue: selectedMarkupForTiers?.markupValue || 0
+    }]);
+  };
+
+  const removeTierRow = (index: number) => {
+    setEditingTiers(editingTiers.filter((_, i) => i !== index));
+  };
+
+  const updateTierRow = (index: number, field: keyof MarkupTier, value: any) => {
+    const updated = [...editingTiers];
+    updated[index] = { ...updated[index], [field]: value };
+    setEditingTiers(updated);
+  };
+
+  const saveTiers = async () => {
+    if (!selectedMarkupForTiers) return;
+
+    try {
+      // Delete existing tiers
+      const existingTiers = markupTiers[selectedMarkupForTiers.id] || [];
+      await Promise.all(
+        existingTiers.map(tier => 
+          fetch(`/api/admin/markup-tiers?id=${tier.id}`, { method: 'DELETE' })
+        )
+      );
+
+      // Create new tiers
+      await Promise.all(
+        editingTiers.map(tier =>
+          fetch('/api/admin/markup-tiers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              markupId: selectedMarkupForTiers.id,
+              minQuantity: tier.minQuantity,
+              maxQuantity: tier.maxQuantity,
+              markupValue: tier.markupValue
+            })
+          })
+        )
+      );
+
+      toast.success('Pricing tiers saved successfully');
+      await fetchMarkupTiers(selectedMarkupForTiers.id);
+      setShowTierDialog(false);
+    } catch (error) {
+      console.error('Failed to save tiers:', error);
+      toast.error('Failed to save pricing tiers');
+    }
+  };
+
+  const [formData, setFormData] = useState({
+    name: '',
+    type: 'category' as 'site_wide' | 'category' | 'product',
+    targetId: '',
+    markupType: 'percentage' as 'percentage' | 'fixed_amount',
+    markupValue: 0,
+    priority: 0,
+    startDate: '',
+    endDate: '',
+    compoundStrategy: 'replace' as 'replace' | 'add' | 'multiply',
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,6 +318,9 @@ export default function AdminMarkupsPage() {
         markupValue: formData.markupValue,
         priority: formData.priority,
         isActive: true,
+        startDate: formData.startDate || null,
+        endDate: formData.endDate || null,
+        compoundStrategy: formData.compoundStrategy,
       };
 
       let response;
@@ -423,72 +538,123 @@ export default function AdminMarkupsPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {markups.map((markup) => (
-                      <div
-                        key={markup.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg border border-border/50 bg-card/50 backdrop-blur"
-                      >
-                        <div className="flex-1 space-y-2">
-                          <div className="flex items-center gap-3 flex-wrap">
-                            <h3 className="font-semibold text-lg">{markup.name}</h3>
-                            <Badge variant="outline" className={`gap-1 ${getTypeBadgeColor(markup.type)}`}>
-                              {getTypeIcon(markup.type)}
-                              {markup.type === 'site_wide' ? 'Site-Wide' : markup.type.charAt(0).toUpperCase() + markup.type.slice(1)}
-                            </Badge>
-                            {!markup.isActive && (
-                              <Badge variant="secondary">Inactive</Badge>
-                            )}
-                            <Badge variant="outline" className="gap-1">
-                              Priority: {markup.priority}
-                            </Badge>
-                          </div>
-                          
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-                            {markup.targetId && (
-                              <span className="flex items-center gap-1">
-                                <Tag className="h-3 w-3" />
-                                Target: {markup.targetId}
-                              </span>
-                            )}
-                            <span className="flex items-center gap-1">
-                              {markup.markupValue >= 0 ? (
-                                <TrendingUp className="h-3 w-3 text-green-600" />
-                              ) : (
-                                <TrendingDown className="h-3 w-3 text-red-600" />
+                    {markups.map((markup) => {
+                      const tiers = markupTiers[markup.id] || [];
+                      const hasTiers = tiers.length > 0;
+                      
+                      return (
+                        <div
+                          key={markup.id}
+                          className="flex flex-col gap-4 p-4 rounded-lg border border-border/50 bg-card/50 backdrop-blur"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex-1 space-y-2">
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <h3 className="font-semibold text-lg">{markup.name}</h3>
+                                <Badge variant="outline" className={`gap-1 ${getTypeBadgeColor(markup.type)}`}>
+                                  {getTypeIcon(markup.type)}
+                                  {markup.type === 'site_wide' ? 'Site-Wide' : markup.type.charAt(0).toUpperCase() + markup.type.slice(1)}
+                                </Badge>
+                                {!markup.isActive && (
+                                  <Badge variant="secondary">Inactive</Badge>
+                                )}
+                                <Badge variant="outline" className="gap-1">
+                                  Priority: {markup.priority}
+                                </Badge>
+                                {hasTiers && (
+                                  <Badge variant="outline" className="gap-1 bg-amber-500/20 text-amber-600 border-amber-500/30">
+                                    <Layers className="h-3 w-3" />
+                                    {tiers.length} Tiers
+                                  </Badge>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
+                                {markup.targetId && (
+                                  <span className="flex items-center gap-1">
+                                    <Tag className="h-3 w-3" />
+                                    Target: {markup.targetId}
+                                  </span>
+                                )}
+                                <span className="flex items-center gap-1">
+                                  {markup.markupValue >= 0 ? (
+                                    <TrendingUp className="h-3 w-3 text-green-600" />
+                                  ) : (
+                                    <TrendingDown className="h-3 w-3 text-red-600" />
+                                  )}
+                                  {markup.markupType === 'percentage' 
+                                    ? `${markup.markupValue > 0 ? '+' : ''}${markup.markupValue}%`
+                                    : `${markup.markupValue > 0 ? '+' : ''}$${markup.markupValue.toFixed(2)}`
+                                  }
+                                </span>
+                                {(markup.startDate || markup.endDate) && (
+                                  <span className="text-xs">
+                                    {markup.startDate && `From ${new Date(markup.startDate).toLocaleDateString()}`}
+                                    {markup.startDate && markup.endDate && ' - '}
+                                    {markup.endDate && `To ${new Date(markup.endDate).toLocaleDateString()}`}
+                                  </span>
+                                )}
+                                <span className="text-xs capitalize">
+                                  Strategy: {markup.compoundStrategy}
+                                </span>
+                              </div>
+                              
+                              {hasTiers && (
+                                <div className="mt-2 p-2 bg-muted/30 rounded text-xs space-y-1">
+                                  <p className="font-medium">Quantity Tiers:</p>
+                                  <div className="flex gap-2 flex-wrap">
+                                    {tiers.map((tier, idx) => (
+                                      <span key={idx} className="inline-flex items-center gap-1 bg-background/50 px-2 py-1 rounded">
+                                        {tier.minQuantity}+{tier.maxQuantity ? `-${tier.maxQuantity}` : ''}: 
+                                        <span className="font-semibold text-primary">
+                                          {markup.markupType === 'percentage' 
+                                            ? `${tier.markupValue}%` 
+                                            : `$${tier.markupValue.toFixed(2)}`
+                                          }
+                                        </span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
                               )}
-                              {markup.markupType === 'percentage' 
-                                ? `${markup.markupValue > 0 ? '+' : ''}${markup.markupValue}%`
-                                : `${markup.markupValue > 0 ? '+' : ''}$${markup.markupValue.toFixed(2)}`
-                              }
-                            </span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenTierDialog(markup)}
+                                className="gap-1"
+                              >
+                                <Layers className="h-4 w-4" />
+                                {hasTiers ? 'Edit' : 'Add'} Tiers
+                              </Button>
+                              <Button
+                                variant={markup.isActive ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => handleToggleActive(markup)}
+                              >
+                                {markup.isActive ? 'Active' : 'Inactive'}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenDialog(markup)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDelete(markup)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant={markup.isActive ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => handleToggleActive(markup)}
-                          >
-                            {markup.isActive ? 'Active' : 'Inactive'}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenDialog(markup)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDelete(markup)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
@@ -650,7 +816,7 @@ export default function AdminMarkupsPage() {
           </TabsContent>
         </Tabs>
 
-        {/* Create/Edit Dialog */}
+        {/* Create/Edit Markup Dialog */}
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -736,25 +902,67 @@ export default function AdminMarkupsPage() {
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    Use negative values for discounts (e.g., -20% or -$5)
+                    Default/base value - can be overridden by quantity tiers
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="priority">
-                  Priority (Higher = Applied First)
-                </Label>
-                <Input
-                  id="priority"
-                  type="number"
-                  value={formData.priority}
-                  onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) })}
-                  placeholder="e.g., 10"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Markups are applied in order of priority (highest first), then creation date
-                </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="startDate">Start Date (Optional)</Label>
+                  <Input
+                    id="startDate"
+                    type="datetime-local"
+                    value={formData.startDate}
+                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="endDate">End Date (Optional)</Label>
+                  <Input
+                    id="endDate"
+                    type="datetime-local"
+                    value={formData.endDate}
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="compoundStrategy">Compound Strategy</Label>
+                  <Select
+                    value={formData.compoundStrategy}
+                    onValueChange={(value: any) => setFormData({ ...formData, compoundStrategy: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="replace">Replace (Reset to base)</SelectItem>
+                      <SelectItem value="add">Add (Cumulative)</SelectItem>
+                      <SelectItem value="multiply">Multiply (Compound)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    How this markup combines with others
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="priority">Priority</Label>
+                  <Input
+                    id="priority"
+                    type="number"
+                    value={formData.priority}
+                    onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) })}
+                    placeholder="e.g., 10"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Higher priority = applied first
+                  </p>
+                </div>
               </div>
 
               <DialogFooter>
@@ -766,6 +974,109 @@ export default function AdminMarkupsPage() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Tier Management Dialog */}
+        <Dialog open={showTierDialog} onOpenChange={setShowTierDialog}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                Manage Quantity-Based Pricing Tiers
+                {selectedMarkupForTiers && (
+                  <p className="text-sm font-normal text-muted-foreground mt-1">
+                    {selectedMarkupForTiers.name}
+                  </p>
+                )}
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Define different markup values based on purchase quantity. Customers buying in higher quantities will see the tier-appropriate pricing.
+              </p>
+
+              {editingTiers.map((tier, index) => (
+                <div key={index} className="flex items-end gap-2 p-3 border rounded-lg">
+                  <div className="flex-1 grid grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Min Qty</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={tier.minQuantity}
+                        onChange={(e) => updateTierRow(index, 'minQuantity', parseInt(e.target.value))}
+                        placeholder="1"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Max Qty</Label>
+                      <Input
+                        type="number"
+                        value={tier.maxQuantity || ''}
+                        onChange={(e) => updateTierRow(index, 'maxQuantity', e.target.value ? parseInt(e.target.value) : null)}
+                        placeholder="∞"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">
+                        Value ({selectedMarkupForTiers?.markupType === 'percentage' ? '%' : '$'})
+                      </Label>
+                      <Input
+                        type="number"
+                        step={selectedMarkupForTiers?.markupType === 'percentage' ? '0.1' : '0.01'}
+                        value={tier.markupValue}
+                        onChange={(e) => updateTierRow(index, 'markupValue', parseFloat(e.target.value))}
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => removeTierRow(index)}
+                    disabled={editingTiers.length === 1}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addTierRow}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Tier
+              </Button>
+
+              <div className="p-3 bg-muted/50 rounded-lg text-sm space-y-1">
+                <p className="font-medium">Example Preview:</p>
+                {editingTiers.map((tier, idx) => (
+                  <p key={idx} className="text-muted-foreground">
+                    {tier.minQuantity}+ {tier.maxQuantity ? `to ${tier.maxQuantity}` : ''} units: 
+                    <span className="ml-1 font-semibold text-primary">
+                      {selectedMarkupForTiers?.markupType === 'percentage' 
+                        ? `${tier.markupValue}%` 
+                        : `$${tier.markupValue.toFixed(2)}`
+                      }
+                    </span>
+                  </p>
+                ))}
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowTierDialog(false)}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={saveTiers}>
+                Save Tiers
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
