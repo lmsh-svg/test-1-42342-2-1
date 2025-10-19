@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Search, ShoppingCart, Filter, Package, SlidersHorizontal, Globe, MapPin, ChevronDown, Gift, TrendingDown } from 'lucide-react';
+import { Search, ShoppingCart, Filter, Package, SlidersHorizontal, Globe, MapPin, ChevronDown, Gift, TrendingDown, Percent } from 'lucide-react';
 import FiltersPanel from '@/components/marketplace/filters-panel';
 import Navbar from '@/components/marketplace/navbar';
 import { ShippingWidget } from '@/components/marketplace/shipping-widget';
@@ -50,12 +50,19 @@ interface BulkPricingRule {
   finalPrice: number | null;
 }
 
+interface MarkupPrice {
+  basePrice: number;
+  finalPrice: number;
+  hasMarkup: boolean;
+}
+
 export default function BrowsePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [bulkPricing, setBulkPricing] = useState<Record<number, BulkPricingRule[]>>({});
+  const [markupPrices, setMarkupPrices] = useState<Record<number, MarkupPrice>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -119,6 +126,8 @@ export default function BrowsePage() {
         setProducts(data);
         // Fetch bulk pricing for all products
         fetchBulkPricing(data.map((p: Product) => p.id));
+        // Fetch markup prices for all products
+        fetchMarkupPrices(data);
       } else {
         console.error('Failed to fetch products:', data);
         setProducts([]);
@@ -131,11 +140,40 @@ export default function BrowsePage() {
     }
   };
 
+  const fetchMarkupPrices = async (products: Product[]) => {
+    try {
+      const markupData: Record<number, MarkupPrice> = {};
+      
+      await Promise.all(
+        products.map(async (product) => {
+          try {
+            const response = await fetch(
+              `/api/admin/calculate-markup-price?productId=${product.id}&categoryName=${product.mainCategory}&basePrice=${product.price}`
+            );
+            if (response.ok) {
+              const data = await response.json();
+              markupData[product.id] = {
+                basePrice: data.basePrice,
+                finalPrice: data.finalPrice,
+                hasMarkup: data.appliedMarkups && data.appliedMarkups.length > 0
+              };
+            }
+          } catch (error) {
+            console.error(`Failed to fetch markup for product ${product.id}:`, error);
+          }
+        })
+      );
+      
+      setMarkupPrices(markupData);
+    } catch (error) {
+      console.error('Failed to fetch markup prices:', error);
+    }
+  };
+
   const fetchBulkPricing = async (productIds: number[]) => {
     try {
       const bulkPricingData: Record<number, BulkPricingRule[]> = {};
       
-      // Fetch bulk pricing for each product
       await Promise.all(
         productIds.map(async (productId) => {
           try {
@@ -158,25 +196,33 @@ export default function BrowsePage() {
     }
   };
 
+  const getDisplayPrice = (product: Product): number => {
+    // Use markup-adjusted price if available, otherwise use base price
+    const markupPrice = markupPrices[product.id];
+    return markupPrice?.finalPrice || product.price;
+  };
+
   const getLowestBulkPrice = (productId: number, basePrice: number) => {
     const rules = bulkPricing[productId];
     if (!rules || rules.length === 0) return null;
     
-    // Find the lowest price from bulk pricing rules
+    // Use markup-adjusted price as the base for bulk calculations
+    const displayPrice = getDisplayPrice(products.find(p => p.id === productId)!);
+    
     const lowestRule = rules.reduce((lowest, rule) => {
-      const rulePrice = rule.finalPrice || basePrice - (rule.discountType === 'percentage' 
-        ? (basePrice * rule.discountValue / 100)
+      const rulePrice = rule.finalPrice || displayPrice - (rule.discountType === 'percentage' 
+        ? (displayPrice * rule.discountValue / 100)
         : rule.discountValue);
       
-      const lowestPrice = lowest.finalPrice || basePrice - (lowest.discountType === 'percentage'
-        ? (basePrice * lowest.discountValue / 100)
+      const lowestPrice = lowest.finalPrice || displayPrice - (lowest.discountType === 'percentage'
+        ? (displayPrice * lowest.discountValue / 100)
         : lowest.discountValue);
       
       return rulePrice < lowestPrice ? rule : lowest;
     }, rules[0]);
     
-    return lowestRule.finalPrice || basePrice - (lowestRule.discountType === 'percentage'
-      ? (basePrice * lowestRule.discountValue / 100)
+    return lowestRule.finalPrice || displayPrice - (lowestRule.discountType === 'percentage'
+      ? (displayPrice * lowestRule.discountValue / 100)
       : lowestRule.discountValue);
   };
 
@@ -348,8 +394,10 @@ export default function BrowsePage() {
               {filteredProducts.map((product) => {
                 const totalStock = getTotalStock(product);
                 const isLowStock = totalStock < 10 && totalStock > 0;
-                const lowestBulkPrice = getLowestBulkPrice(product.id, product.price);
+                const displayPrice = getDisplayPrice(product);
+                const lowestBulkPrice = getLowestBulkPrice(product.id, displayPrice);
                 const hasBulkPricing = bulkPricing[product.id] && bulkPricing[product.id].length > 0;
+                const hasMarkup = markupPrices[product.id]?.hasMarkup;
                 
                 return (
                   <Card 
@@ -384,12 +432,20 @@ export default function BrowsePage() {
                         </Badge>
                       )}
                       
-                      {hasBulkPricing && (
-                        <Badge className="absolute bottom-1.5 left-1.5 text-xs bg-green-500/90 backdrop-blur-sm flex items-center gap-1">
-                          <TrendingDown className="h-3 w-3" />
-                          Bulk
-                        </Badge>
-                      )}
+                      <div className="absolute bottom-1.5 left-1.5 flex gap-1">
+                        {hasBulkPricing && (
+                          <Badge className="text-xs bg-green-500/90 backdrop-blur-sm flex items-center gap-1">
+                            <TrendingDown className="h-3 w-3" />
+                            Bulk
+                          </Badge>
+                        )}
+                        
+                        {hasMarkup && (
+                          <Badge className="text-xs bg-purple-500/90 backdrop-blur-sm flex items-center gap-1">
+                            <Percent className="h-3 w-3" />
+                          </Badge>
+                        )}
+                      </div>
                       
                       {totalStock === 0 && (
                         <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center">
@@ -413,18 +469,25 @@ export default function BrowsePage() {
                       
                       <div className="flex items-center justify-between pt-1.5">
                         <div className="flex flex-col">
-                          {lowestBulkPrice && lowestBulkPrice < product.price ? (
+                          {hasMarkup && displayPrice !== product.price && (
+                            <span className="text-xs text-muted-foreground line-through">
+                              ${product.price.toFixed(2)}
+                            </span>
+                          )}
+                          {lowestBulkPrice && lowestBulkPrice < displayPrice ? (
                             <>
-                              <span className="text-xs text-muted-foreground line-through">
-                                ${product.price.toFixed(2)}
-                              </span>
+                              {!hasMarkup && (
+                                <span className="text-xs text-muted-foreground line-through">
+                                  ${displayPrice.toFixed(2)}
+                                </span>
+                              )}
                               <span className="text-lg font-bold text-green-600">
                                 From ${lowestBulkPrice.toFixed(2)}
                               </span>
                             </>
                           ) : (
-                            <span className="text-lg font-bold text-foreground">
-                              ${product.price.toFixed(2)}
+                            <span className={`text-lg font-bold ${hasMarkup ? 'text-primary' : 'text-foreground'}`}>
+                              ${displayPrice.toFixed(2)}
                             </span>
                           )}
                         </div>

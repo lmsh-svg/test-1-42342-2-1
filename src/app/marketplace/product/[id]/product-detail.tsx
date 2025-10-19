@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ShoppingCart, Package, Minus, Plus, CheckCircle2, AlertCircle, ChevronRight, TrendingDown } from 'lucide-react';
+import { ChevronLeft, ShoppingCart, Package, Minus, Plus, CheckCircle2, AlertCircle, ChevronRight, TrendingDown, Percent } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/use-auth';
 import { ProductReviews } from '@/components/marketplace/product-reviews';
@@ -55,6 +55,20 @@ interface BulkPricingRule {
   createdAt: string;
 }
 
+interface MarkupCalculation {
+  basePrice: number;
+  finalPrice: number;
+  appliedMarkups: {
+    id: number;
+    name: string;
+    type: string;
+    markupType: string;
+    markupValue: number;
+    priority: number;
+    priceAfterMarkup: number;
+  }[];
+}
+
 interface ProductDetailProps {
   productId: string;
 }
@@ -66,6 +80,7 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
   const [variants, setVariants] = useState<Variant[]>([]);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, Variant>>({});
   const [bulkPricingRules, setBulkPricingRules] = useState<BulkPricingRule[]>([]);
+  const [markupCalculation, setMarkupCalculation] = useState<MarkupCalculation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -89,6 +104,19 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
       if (productRes.ok) {
         const productData = await productRes.json();
         setProduct(productData);
+        
+        // Fetch markup calculation
+        try {
+          const markupRes = await fetch(
+            `/api/admin/calculate-markup-price?productId=${productId}&categoryName=${productData.mainCategory}&basePrice=${productData.price}`
+          );
+          if (markupRes.ok) {
+            const markupData = await markupRes.json();
+            setMarkupCalculation(markupData);
+          }
+        } catch (error) {
+          console.error('Failed to fetch markup calculation:', error);
+        }
         
         // Fetch bulk pricing rules
         const bulkPricingRes = await fetch(`/api/admin/bulk-pricing?productId=${productId}`);
@@ -169,6 +197,21 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
     }
   };
 
+  const getBasePrice = () => {
+    if (!product) return 0;
+    // Use markup-adjusted price as the base
+    return markupCalculation?.finalPrice || product.price;
+  };
+
+  const getCurrentPrice = () => {
+    const basePrice = getBasePrice();
+    const variantModifiers = Object.values(selectedVariants).reduce(
+      (sum, v) => sum + v.priceModifier, 
+      0
+    );
+    return basePrice + variantModifiers;
+  };
+
   const calculateBulkPrice = (basePrice: number, qty: number): { price: number; savings: number; appliedRule: BulkPricingRule | null } => {
     if (bulkPricingRules.length === 0) {
       return { price: basePrice, savings: 0, appliedRule: null };
@@ -196,15 +239,6 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
 
     const savings = basePrice - discountedPrice;
     return { price: discountedPrice, savings, appliedRule: rule };
-  };
-
-  const getCurrentPrice = () => {
-    if (!product) return 0;
-    const variantModifiers = Object.values(selectedVariants).reduce(
-      (sum, v) => sum + v.priceModifier, 
-      0
-    );
-    return product.price + variantModifiers;
   };
 
   const getFinalPrice = () => {
@@ -484,8 +518,31 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
             </div>
           </div>
 
-          {/* Price with Bulk Pricing */}
+          {/* Price with Markup & Bulk Pricing */}
           <div className="border-b pb-6">
+            {/* Markup Notification */}
+            {markupCalculation && markupCalculation.appliedMarkups.length > 0 && (
+              <div className="mb-3 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                <div className="flex items-start gap-2 text-sm">
+                  <Percent className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-foreground">Store Markup Applied</p>
+                    {markupCalculation.appliedMarkups.map((markup, idx) => (
+                      <p key={idx} className="text-xs text-muted-foreground">
+                        {markup.name}: {markup.markupType === 'percentage' 
+                          ? `${markup.markupValue > 0 ? '+' : ''}${markup.markupValue}%`
+                          : `${markup.markupValue > 0 ? '+' : ''}$${markup.markupValue.toFixed(2)}`
+                        }
+                      </p>
+                    ))}
+                    <p className="text-xs text-primary font-medium">
+                      Base: ${product.price.toFixed(2)} → Final: ${markupCalculation.finalPrice.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-baseline gap-3 mb-2">
               <span className="text-5xl font-bold text-foreground">
                 ${finalPrice.toFixed(2)}
