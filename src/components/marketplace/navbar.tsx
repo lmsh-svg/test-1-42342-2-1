@@ -139,6 +139,16 @@ export default function Navbar() {
                 <span>Cart</span>
               </Button>
 
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/marketplace/reward-store')}
+                className="gap-2 text-amber-600 dark:text-amber-400 hover:text-amber-600 dark:hover:text-amber-400"
+              >
+                <Award className="h-4 w-4" />
+                <span>Rewards Store</span>
+              </Button>
+
               {/* Settings/Menu Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

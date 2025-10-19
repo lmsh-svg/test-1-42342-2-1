@@ -23,7 +23,8 @@ const MAIN_CATEGORIES = [
   'Pre Rolls',
   'Accessories',
   'Topicals',
-  'BYOB'
+  'BYOB',
+  'Rewards Store'
 ];
 
 interface Product {
