@@ -123,7 +123,7 @@ export default function AdminTicketsPage() {
     try {
       const token = localStorage.getItem('auth_token');
       
-      await fetch(`/api/support-tickets/${ticketId}`, {
+      await fetch(`/api/support-tickets?id=${ticketId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

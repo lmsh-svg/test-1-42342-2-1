@@ -102,9 +102,9 @@ export default function CryptoPriceWidget() {
                   : currentData.price;
                 
                 let priceChange: 'up' | 'down' | 'neutral' = 'neutral';
-                if (newPrice > previousPrice) {
+                if (newPrice > previousPrice && previousPrice > 0) {
                   priceChange = 'up';
-                } else if (newPrice < previousPrice) {
+                } else if (newPrice < previousPrice && previousPrice > 0) {
                   priceChange = 'down';
                 }
                 
@@ -137,16 +137,36 @@ export default function CryptoPriceWidget() {
     return () => clearInterval(interval);
   }, [cryptoAddresses]);
 
-  // Rotate through cryptocurrencies
+  // Rotate through cryptocurrencies - only switch if next crypto has valid data
   useEffect(() => {
     if (cryptoAddresses.length <= 1) return;
 
     const interval = setInterval(() => {
-      setCurrentIndex(prev => (prev + 1) % cryptoAddresses.length);
+      setCurrentIndex(prev => {
+        // Find next crypto with valid price data
+        let nextIndex = (prev + 1) % cryptoAddresses.length;
+        let attempts = 0;
+        
+        while (attempts < cryptoAddresses.length) {
+          const nextCrypto = cryptoAddresses[nextIndex];
+          const nextPriceData = priceDataMap.get(nextCrypto.cryptocurrency.toUpperCase());
+          
+          // Only switch if the next crypto has loaded price data
+          if (nextPriceData && nextPriceData.price > 0) {
+            return nextIndex;
+          }
+          
+          nextIndex = (nextIndex + 1) % cryptoAddresses.length;
+          attempts++;
+        }
+        
+        // If no valid crypto found, keep current
+        return prev;
+      });
     }, 4000); // Change every 4 seconds
 
     return () => clearInterval(interval);
-  }, [cryptoAddresses.length]);
+  }, [cryptoAddresses, priceDataMap]);
 
   if (isLoading || cryptoAddresses.length === 0) {
     return null;
@@ -155,7 +175,8 @@ export default function CryptoPriceWidget() {
   const currentCrypto = cryptoAddresses[currentIndex];
   const currentPriceData = priceDataMap.get(currentCrypto.cryptocurrency.toUpperCase());
 
-  if (!currentPriceData) return null;
+  // Don't render if no valid price data - keep showing previous
+  if (!currentPriceData || currentPriceData.price === 0) return null;
 
   const renderSparkline = (history: number[]) => {
     if (history.length < 2) return null;

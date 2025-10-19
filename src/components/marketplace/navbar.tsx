@@ -147,7 +147,7 @@ export default function Navbar() {
                       <CheckCircle className="h-4 w-4 mr-2" />
                       Crypto Verifications
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => router.push('/marketplace/support')}>
+                    <DropdownMenuItem onClick={() => router.push('/admin/tickets')}>
                       <TicketCheck className="h-4 w-4 mr-2" />
                       Support Tickets
                     </DropdownMenuItem>

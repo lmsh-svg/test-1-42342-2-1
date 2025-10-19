@@ -143,11 +143,6 @@ export default function MarketplacePage() {
           </div>
         </div>
 
-        {/* Crypto Price Widget */}
-        <div className="max-w-7xl mx-auto px-4 pt-6">
-          <CryptoPriceWidget />
-        </div>
-
         <div className="max-w-7xl mx-auto px-4 py-8">
           {/* Hero Section */}
           <div className="mb-12 text-center">
