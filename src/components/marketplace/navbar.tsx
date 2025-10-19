@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Shield, ShoppingCart, Home, Settings, Package, LogOut, Award, User, Users, TicketCheck, Store, Wallet, CheckCircle, Menu } from 'lucide-react';
+import { Shield, ShoppingCart, Home, Settings, Package, LogOut, Award, User, Users, TicketCheck, Store, Wallet, CheckCircle, Menu, HelpCircle } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -175,7 +175,7 @@ export default function Navbar() {
                     Settings
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push('/marketplace/support')}>
-                    <TicketCheck className="h-4 w-4 mr-2" />
+                    <HelpCircle className="h-4 w-4 mr-2" />
                     Support
                   </DropdownMenuItem>
                   
@@ -276,6 +276,15 @@ export default function Navbar() {
                   >
                     <Settings className="h-5 w-5" />
                     <span>Settings</span>
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 h-11"
+                    onClick={() => handleNavigation('/marketplace/support')}
+                  >
+                    <HelpCircle className="h-5 w-5" />
+                    <span>Support</span>
                   </Button>
 
                   {isAdmin && (

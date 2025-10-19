@@ -323,17 +323,17 @@ export default function MarketplacePage() {
           {/* Rewards Progress Section */}
           {rewardData && (
             <Card className="border-border/50 bg-gradient-to-br from-card/50 to-primary/5 backdrop-blur">
-              <CardContent className="p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="text-5xl">
+              <CardContent className="p-4 sm:p-6 lg:p-8">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-4 lg:mb-6">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="text-3xl sm:text-4xl lg:text-5xl">
                       {TIER_CONFIG[rewardData.currentTier]?.icon || '🥉'}
                     </div>
                     <div>
-                      <h3 className="text-2xl font-bold">
+                      <h3 className="text-xl sm:text-2xl font-bold">
                         {TIER_CONFIG[rewardData.currentTier]?.name || 'Bronze'} Member
                       </h3>
-                      <p className="text-muted-foreground">
+                      <p className="text-sm sm:text-base text-muted-foreground">
                         Earning {rewardData.cashbackRate}% cashback on all purchases
                       </p>
                     </div>
@@ -342,7 +342,7 @@ export default function MarketplacePage() {
                     size="lg"
                     variant="outline" 
                     onClick={() => router.push('/marketplace/rewards')}
-                    className="gap-2"
+                    className="gap-2 w-full sm:w-auto"
                   >
                     <Award className="h-5 w-5" />
                     View Rewards
@@ -350,16 +350,16 @@ export default function MarketplacePage() {
                 </div>
                 
                 {rewardData.nextTier && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">
+                  <div className="space-y-2 sm:space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
+                      <span className="text-sm sm:text-base text-muted-foreground">
                         Progress to {TIER_CONFIG[rewardData.nextTier]?.name}
                       </span>
-                      <span className="font-bold text-lg">
+                      <span className="font-bold text-base sm:text-lg">
                         ${rewardData.amountUntilNextTier.toFixed(2)} to go
                       </span>
                     </div>
-                    <Progress value={calculateRewardProgress()} className="h-3" />
+                    <Progress value={calculateRewardProgress()} className="h-2 sm:h-3" />
                   </div>
                 )}
               </CardContent>

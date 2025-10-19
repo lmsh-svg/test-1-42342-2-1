@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Search, ShoppingCart, Filter, Package, SlidersHorizontal, Globe, MapPin, ChevronDown } from 'lucide-react';
+import { Search, ShoppingCart, Filter, Package, SlidersHorizontal, Globe, MapPin, ChevronDown, Gift } from 'lucide-react';
 import FiltersPanel from '@/components/marketplace/filters-panel';
 import Navbar from '@/components/marketplace/navbar';
 import { ShippingWidget } from '@/components/marketplace/shipping-widget';
@@ -387,11 +387,11 @@ export default function BrowsePage() {
                 </button>
               ))}
               <button
-                onClick={() => router.push('/marketplace/orders')}
-                className="flex-shrink-0 px-4 py-2 rounded-full text-xs font-medium bg-muted/50 text-muted-foreground hover:bg-muted transition-all flex items-center gap-1.5"
+                onClick={() => router.push('/marketplace/reward-store')}
+                className="flex-shrink-0 px-4 py-2 rounded-full text-xs font-medium bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-600 dark:text-amber-400 hover:from-amber-500/30 hover:to-orange-500/30 transition-all flex items-center gap-1.5 border border-amber-500/30"
               >
-                <Package className="h-3.5 w-3.5" />
-                <span>Orders</span>
+                <Gift className="h-3.5 w-3.5" />
+                <span>Reward Store</span>
               </button>
             </div>
           </div>
