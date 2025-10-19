@@ -143,7 +143,7 @@ export default function BrowsePage() {
   return (
     <>
       <Navbar />
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 pb-20 lg:pb-8">
         <div className="border-b border-border/50 backdrop-blur-sm">
           <div className="max-w-7xl mx-auto px-4 py-3">
             <ShippingWidget />
@@ -212,24 +212,6 @@ export default function BrowsePage() {
                 ))}
               </TabsList>
             </Tabs>
-          </div>
-
-          <div className="mb-6 lg:hidden">
-            <div className="relative">
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full h-12 px-4 pr-10 rounded-lg border border-border/50 bg-card/50 text-base backdrop-blur focus:outline-none focus:ring-2 focus:ring-primary appearance-none"
-              >
-                <option value="all">All Products</option>
-                {MAIN_CATEGORIES.map(category => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
-            </div>
           </div>
 
           <div className="flex items-center justify-between mb-6 gap-4">
@@ -376,6 +358,43 @@ export default function BrowsePage() {
               })}
             </div>
           )}
+        </div>
+
+        <div className="fixed bottom-0 left-0 right-0 z-40 lg:hidden border-t border-border/50 bg-card/95 backdrop-blur-xl">
+          <div className="overflow-x-auto scrollbar-hide">
+            <div className="flex items-center gap-1 px-2 py-2 min-w-max">
+              <button
+                onClick={() => setSelectedCategory('all')}
+                className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-medium transition-all ${
+                  selectedCategory === 'all'
+                    ? 'bg-primary text-primary-foreground shadow-lg'
+                    : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                All
+              </button>
+              {MAIN_CATEGORIES.map(category => (
+                <button
+                  key={category}
+                  onClick={() => setSelectedCategory(category)}
+                  className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                    selectedCategory === category
+                      ? 'bg-primary text-primary-foreground shadow-lg'
+                      : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {category}
+                </button>
+              ))}
+              <button
+                onClick={() => router.push('/marketplace/orders')}
+                className="flex-shrink-0 px-4 py-2 rounded-full text-xs font-medium bg-muted/50 text-muted-foreground hover:bg-muted transition-all flex items-center gap-1.5"
+              >
+                <Package className="h-3.5 w-3.5" />
+                <span>Orders</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </>

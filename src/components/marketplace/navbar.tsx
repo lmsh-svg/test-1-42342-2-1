@@ -68,290 +68,275 @@ export default function Navbar() {
 
   return (
     <nav className="sticky top-0 z-50 border-b border-border/50 bg-card/80 backdrop-blur-lg">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo/Brand */}
-          <div className="flex items-center gap-2">
-            <Shield className="h-6 w-6 text-primary" />
-            <span className="text-xl font-bold text-foreground hidden sm:inline">Secure Marketplace</span>
-            <span className="text-lg font-bold text-foreground sm:hidden">Marketplace</span>
-          </div>
-
-          {/* Desktop Navigation - Hidden on mobile */}
-          <div className="hidden lg:flex items-center gap-2">
-            {/* Crypto Ticker - Always visible */}
-            <CryptoTicker />
-
-            {/* Credits Display - Always visible, shows loading state */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push('/marketplace/deposits')}
-              className="gap-2 font-semibold"
-              disabled={isLoadingCredits}
-            >
-              <Wallet className="h-4 w-4" />
-              <span className="hidden sm:inline">Credits:</span>
-              {isLoadingCredits ? (
-                <span className="text-muted-foreground">--</span>
-              ) : (
-                <span className="text-primary">${credits.toFixed(2)}</span>
-              )}
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push('/marketplace')}
-              className="gap-2"
-            >
-              <Home className="h-4 w-4" />
-              <span className="hidden sm:inline">Home</span>
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push('/marketplace/browse')}
-              className="gap-2"
-            >
-              <Store className="h-4 w-4" />
-              <span className="hidden sm:inline">Browse</span>
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push('/marketplace/orders')}
-              className="gap-2"
-            >
-              <Package className="h-4 w-4" />
-              <span className="hidden sm:inline">Orders</span>
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push('/marketplace/cart')}
-              className="gap-2"
-            >
-              <ShoppingCart className="h-4 w-4" />
-              <span className="hidden sm:inline">Cart</span>
-            </Button>
-
-            {/* Settings/Menu Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <Settings className="h-4 w-4" />
-                  <span className="hidden sm:inline">Menu</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                {/* Admin Dashboard Link - Only shown to admins */}
-                {isAdmin && (
-                  <>
-                    <DropdownMenuItem onClick={() => router.push('/admin')}>
-                      <Shield className="h-4 w-4 mr-2" />
-                      Admin Dashboard
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                  </>
-                )}
-                
-                {/* Common menu items for all users */}
-                <DropdownMenuItem onClick={() => router.push('/marketplace/orders')}>
-                  <Package className="h-4 w-4 mr-2" />
-                  My Orders
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/marketplace/rewards')}>
-                  <Award className="h-4 w-4 mr-2" />
-                  Rewards
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/marketplace/verify-deposit')}>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Verify Deposit
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/marketplace/settings')}>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Settings
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/marketplace/support')}>
-                  <TicketCheck className="h-4 w-4 mr-2" />
-                  Support
-                </DropdownMenuItem>
-                
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="text-destructive">
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          {/* Mobile Navigation - Only visible on mobile */}
-          <div className="flex lg:hidden items-center gap-2">
-            {/* Crypto Ticker on mobile - compact */}
-            <div className="hidden sm:block">
-              <CryptoTicker />
+      {/* Desktop Navigation */}
+      <div className="hidden lg:block">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo/Brand */}
+            <div className="flex items-center gap-2">
+              <Shield className="h-6 w-6 text-primary" />
+              <span className="text-xl font-bold text-foreground">Secure Marketplace</span>
             </div>
 
-            {/* Mobile Menu Sheet */}
+            <div className="flex items-center gap-2">
+              {/* Crypto Ticker */}
+              <CryptoTicker />
+
+              {/* Credits Display */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push('/marketplace/deposits')}
+                className="gap-2 font-semibold"
+                disabled={isLoadingCredits}
+              >
+                <Wallet className="h-4 w-4" />
+                <span>Credits:</span>
+                {isLoadingCredits ? (
+                  <span className="text-muted-foreground">--</span>
+                ) : (
+                  <span className="text-primary">${credits.toFixed(2)}</span>
+                )}
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/marketplace')}
+                className="gap-2"
+              >
+                <Home className="h-4 w-4" />
+                <span>Home</span>
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/marketplace/browse')}
+                className="gap-2"
+              >
+                <Store className="h-4 w-4" />
+                <span>Browse</span>
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/marketplace/orders')}
+                className="gap-2"
+              >
+                <Package className="h-4 w-4" />
+                <span>Orders</span>
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/marketplace/cart')}
+                className="gap-2"
+              >
+                <ShoppingCart className="h-4 w-4" />
+                <span>Cart</span>
+              </Button>
+
+              {/* Settings/Menu Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-2">
+                    <Settings className="h-4 w-4" />
+                    <span>Menu</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuItem onClick={() => router.push('/admin')}>
+                        <Shield className="h-4 w-4 mr-2" />
+                        Admin Dashboard
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  
+                  <DropdownMenuItem onClick={() => router.push('/marketplace/orders')}>
+                    <Package className="h-4 w-4 mr-2" />
+                    My Orders
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push('/marketplace/rewards')}>
+                    <Award className="h-4 w-4 mr-2" />
+                    Rewards
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push('/marketplace/verify-deposit')}>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Verify Deposit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push('/marketplace/settings')}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push('/marketplace/support')}>
+                    <TicketCheck className="h-4 w-4 mr-2" />
+                    Support
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Navigation */}
+      <div className="lg:hidden">
+        {/* Top Bar */}
+        <div className="max-w-7xl mx-auto px-3">
+          <div className="flex items-center justify-between h-14">
+            {/* Logo */}
+            <div className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              <span className="text-base font-bold text-foreground">Marketplace</span>
+            </div>
+
+            {/* Menu Button */}
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-2">
+                <Button variant="ghost" size="sm">
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] sm:w-[350px]">
-                <SheetHeader className="mb-6">
-                  <SheetTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5 text-primary" />
-                    Menu
-                  </SheetTitle>
+              <SheetContent side="right" className="w-[280px]">
+                <SheetHeader className="mb-4">
+                  <SheetTitle className="text-left">Menu</SheetTitle>
                 </SheetHeader>
 
-                <div className="flex flex-col gap-3">
-                  {/* Credits Card */}
-                  <div className="bg-muted/50 rounded-lg p-4 border border-border/50">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-muted-foreground">Your Credits</span>
-                      <Wallet className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    {isLoadingCredits ? (
-                      <div className="text-2xl font-bold text-foreground">--</div>
-                    ) : (
-                      <div className="text-2xl font-bold text-primary">${credits.toFixed(2)}</div>
-                    )}
-                    <Button 
-                      size="sm" 
-                      className="w-full mt-3"
-                      onClick={() => handleNavigation('/marketplace/deposits')}
-                    >
-                      Add Credits
-                    </Button>
-                  </div>
+                <div className="flex flex-col gap-1">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 h-11"
+                    onClick={() => handleNavigation('/marketplace')}
+                  >
+                    <Home className="h-5 w-5" />
+                    <span>Home</span>
+                  </Button>
 
-                  {/* Crypto Ticker on very small screens */}
-                  <div className="sm:hidden bg-muted/50 rounded-lg p-3 border border-border/50">
-                    <CryptoTicker />
-                  </div>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 h-11"
+                    onClick={() => handleNavigation('/marketplace/browse')}
+                  >
+                    <Store className="h-5 w-5" />
+                    <span>View Products</span>
+                  </Button>
 
-                  {/* Main Navigation */}
-                  <div className="space-y-1">
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start gap-3 h-12"
-                      onClick={() => handleNavigation('/marketplace')}
-                    >
-                      <Home className="h-5 w-5" />
-                      <span className="text-base">Home</span>
-                    </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 h-11"
+                    onClick={() => handleNavigation('/marketplace/cart')}
+                  >
+                    <ShoppingCart className="h-5 w-5" />
+                    <span>Shopping Cart</span>
+                  </Button>
 
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start gap-3 h-12"
-                      onClick={() => handleNavigation('/marketplace/browse')}
-                    >
-                      <Store className="h-5 w-5" />
-                      <span className="text-base">Browse Products</span>
-                    </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 h-11"
+                    onClick={() => handleNavigation('/marketplace/orders')}
+                  >
+                    <Package className="h-5 w-5" />
+                    <span>My Orders</span>
+                  </Button>
 
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start gap-3 h-12"
-                      onClick={() => handleNavigation('/marketplace/cart')}
-                    >
-                      <ShoppingCart className="h-5 w-5" />
-                      <span className="text-base">Shopping Cart</span>
-                    </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 h-11"
+                    onClick={() => handleNavigation('/marketplace/rewards')}
+                  >
+                    <Award className="h-5 w-5" />
+                    <span>Rewards</span>
+                  </Button>
 
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start gap-3 h-12"
-                      onClick={() => handleNavigation('/marketplace/orders')}
-                    >
-                      <Package className="h-5 w-5" />
-                      <span className="text-base">My Orders</span>
-                    </Button>
-                  </div>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 h-11"
+                    onClick={() => handleNavigation('/marketplace/verify-deposit')}
+                  >
+                    <CheckCircle className="h-5 w-5" />
+                    <span>Verified Deposit</span>
+                  </Button>
 
-                  {/* Separator */}
-                  <div className="border-t border-border/50 my-2" />
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 h-11"
+                    onClick={() => handleNavigation('/marketplace/settings')}
+                  >
+                    <Settings className="h-5 w-5" />
+                    <span>Settings</span>
+                  </Button>
 
-                  {/* Admin Dashboard - Only for admins */}
                   {isAdmin && (
                     <>
+                      <div className="border-t border-border/50 my-2" />
                       <Button
                         variant="ghost"
-                        className="w-full justify-start gap-3 h-12"
+                        className="w-full justify-start gap-3 h-11"
                         onClick={() => handleNavigation('/admin')}
                       >
                         <Shield className="h-5 w-5" />
-                        <span className="text-base">Admin Dashboard</span>
+                        <span>Admin Dashboard</span>
                       </Button>
-                      <div className="border-t border-border/50 my-2" />
                     </>
                   )}
 
-                  {/* Additional Options */}
-                  <div className="space-y-1">
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start gap-3 h-12"
-                      onClick={() => handleNavigation('/marketplace/rewards')}
-                    >
-                      <Award className="h-5 w-5" />
-                      <span className="text-base">Rewards</span>
-                    </Button>
-
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start gap-3 h-12"
-                      onClick={() => handleNavigation('/marketplace/verify-deposit')}
-                    >
-                      <CheckCircle className="h-5 w-5" />
-                      <span className="text-base">Verify Deposit</span>
-                    </Button>
-
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start gap-3 h-12"
-                      onClick={() => handleNavigation('/marketplace/settings')}
-                    >
-                      <Settings className="h-5 w-5" />
-                      <span className="text-base">Settings</span>
-                    </Button>
-
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start gap-3 h-12"
-                      onClick={() => handleNavigation('/marketplace/support')}
-                    >
-                      <TicketCheck className="h-5 w-5" />
-                      <span className="text-base">Support</span>
-                    </Button>
-                  </div>
-
-                  {/* Separator */}
                   <div className="border-t border-border/50 my-2" />
 
-                  {/* Logout */}
                   <Button
                     variant="ghost"
-                    className="w-full justify-start gap-3 h-12 text-destructive hover:text-destructive"
+                    className="w-full justify-start gap-3 h-11 text-destructive hover:text-destructive"
                     onClick={() => {
                       setMobileMenuOpen(false);
                       handleLogout();
                     }}
                   >
                     <LogOut className="h-5 w-5" />
-                    <span className="text-base">Logout</span>
+                    <span>Logout</span>
                   </Button>
                 </div>
               </SheetContent>
             </Sheet>
+          </div>
+        </div>
+
+        {/* Credits & Crypto Bar - Mobile Only */}
+        <div className="border-t border-border/50 bg-muted/30">
+          <div className="max-w-7xl mx-auto px-3 py-2">
+            <div className="flex items-center justify-between gap-3">
+              {/* Credits - Prominent Display */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push('/marketplace/deposits')}
+                className="gap-2 font-semibold flex-1 h-9 bg-card/50"
+                disabled={isLoadingCredits}
+              >
+                <Wallet className="h-4 w-4" />
+                <span className="text-xs">Credits:</span>
+                {isLoadingCredits ? (
+                  <span className="text-xs text-muted-foreground">--</span>
+                ) : (
+                  <span className="text-xs font-bold text-primary">${credits.toFixed(2)}</span>
+                )}
+              </Button>
+
+              {/* Crypto Ticker */}
+              <div className="flex-shrink-0">
+                <CryptoTicker />
+              </div>
+            </div>
           </div>
         </div>
       </div>
