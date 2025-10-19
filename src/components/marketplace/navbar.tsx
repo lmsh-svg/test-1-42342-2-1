@@ -120,7 +120,7 @@ export default function Navbar() {
               <span className="hidden sm:inline">Cart</span>
             </Button>
 
-            {/* Settings/Admin Dropdown */}
+            {/* Settings/Menu Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="gap-2">
@@ -129,53 +129,39 @@ export default function Navbar() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                {isAdmin ? (
+                {/* Admin Dashboard Link - Only shown to admins */}
+                {isAdmin && (
                   <>
                     <DropdownMenuItem onClick={() => router.push('/admin')}>
                       <Shield className="h-4 w-4 mr-2" />
                       Admin Dashboard
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => router.push('/admin/orders')}>
-                      <Package className="h-4 w-4 mr-2" />
-                      Manage Orders
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => router.push('/admin/users')}>
-                      <Users className="h-4 w-4 mr-2" />
-                      Manage Users
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => router.push('/admin/verifications')}>
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Crypto Verifications
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => router.push('/admin/tickets')}>
-                      <TicketCheck className="h-4 w-4 mr-2" />
-                      Support Tickets
-                    </DropdownMenuItem>
-                  </>
-                ) : (
-                  <>
-                    <DropdownMenuItem onClick={() => router.push('/marketplace/orders')}>
-                      <Package className="h-4 w-4 mr-2" />
-                      My Orders
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => router.push('/marketplace/rewards')}>
-                      <Award className="h-4 w-4 mr-2" />
-                      Rewards
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => router.push('/marketplace/verify-deposit')}>
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Verify Deposit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => router.push('/marketplace/settings')}>
-                      <Settings className="h-4 w-4 mr-2" />
-                      Settings
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => router.push('/marketplace/support')}>
-                      <TicketCheck className="h-4 w-4 mr-2" />
-                      Support
-                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
                   </>
                 )}
+                
+                {/* Common menu items for all users */}
+                <DropdownMenuItem onClick={() => router.push('/marketplace/orders')}>
+                  <Package className="h-4 w-4 mr-2" />
+                  My Orders
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/marketplace/rewards')}>
+                  <Award className="h-4 w-4 mr-2" />
+                  Rewards
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/marketplace/verify-deposit')}>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Verify Deposit
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/marketplace/settings')}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/marketplace/support')}>
+                  <TicketCheck className="h-4 w-4 mr-2" />
+                  Support
+                </DropdownMenuItem>
+                
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="text-destructive">
                   <LogOut className="h-4 w-4 mr-2" />

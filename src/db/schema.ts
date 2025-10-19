@@ -75,6 +75,7 @@ export const supportTickets = sqliteTable('support_tickets', {
   userId: integer('user_id').notNull().references(() => users.id),
   orderId: integer('order_id').references(() => orders.id),
   subject: text('subject').notNull(),
+  category: text('category').notNull(),
   status: text('status').notNull().default('open'),
   priority: text('priority').notNull().default('medium'),
   createdAt: text('created_at').notNull(),

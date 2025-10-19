@@ -5,6 +5,7 @@ import { eq, and, desc } from 'drizzle-orm';
 
 const VALID_STATUSES = ['open', 'in_progress', 'resolved', 'closed'];
 const VALID_PRIORITIES = ['low', 'medium', 'high'];
+const VALID_CATEGORIES = ['technical', 'billing', 'order', 'account', 'general'];
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,6 +42,7 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId');
     const status = searchParams.get('status');
     const priority = searchParams.get('priority');
+    const category = searchParams.get('category');
 
     let query = db.select().from(supportTickets);
 
@@ -77,6 +79,16 @@ export async function GET(request: NextRequest) {
       conditions.push(eq(supportTickets.priority, priority));
     }
 
+    if (category) {
+      if (!VALID_CATEGORIES.includes(category)) {
+        return NextResponse.json({ 
+          error: `Invalid category. Must be one of: ${VALID_CATEGORIES.join(', ')}`,
+          code: "INVALID_CATEGORY" 
+        }, { status: 400 });
+      }
+      conditions.push(eq(supportTickets.category, category));
+    }
+
     if (conditions.length > 0) {
       query = query.where(and(...conditions));
     }
@@ -100,7 +112,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, subject, orderId, status, priority } = body;
+    const { userId, subject, category, orderId, status, priority } = body;
 
     // Validate required fields
     if (!userId) {
@@ -121,6 +133,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ 
         error: "subject is required and must be a non-empty string",
         code: "MISSING_SUBJECT" 
+      }, { status: 400 });
+    }
+
+    if (!category) {
+      return NextResponse.json({ 
+        error: "category is required",
+        code: "MISSING_CATEGORY" 
+      }, { status: 400 });
+    }
+
+    if (!VALID_CATEGORIES.includes(category)) {
+      return NextResponse.json({ 
+        error: `Invalid category. Must be one of: ${VALID_CATEGORIES.join(', ')}`,
+        code: "INVALID_CATEGORY" 
       }, { status: 400 });
     }
 
@@ -155,6 +181,7 @@ export async function POST(request: NextRequest) {
     const insertData: any = {
       userId: parseInt(userId),
       subject: subject.trim(),
+      category: category,
       status: ticketStatus,
       priority: ticketPriority,
       createdAt: now,
@@ -192,7 +219,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { subject, status, priority, orderId } = body;
+    const { subject, category, status, priority, orderId } = body;
 
     // Check if ticket exists
     const existingTicket = await db.select()
@@ -220,6 +247,16 @@ export async function PUT(request: NextRequest) {
         }, { status: 400 });
       }
       updates.subject = subject.trim();
+    }
+
+    if (category !== undefined) {
+      if (!VALID_CATEGORIES.includes(category)) {
+        return NextResponse.json({ 
+          error: `Invalid category. Must be one of: ${VALID_CATEGORIES.join(', ')}`,
+          code: "INVALID_CATEGORY" 
+        }, { status: 400 });
+      }
+      updates.category = category;
     }
 
     if (status !== undefined) {

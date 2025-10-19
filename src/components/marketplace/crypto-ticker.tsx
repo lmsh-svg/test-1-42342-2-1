@@ -11,8 +11,10 @@ interface CryptoAddress {
 
 interface PriceData {
   price: number;
+  previousPrice: number;
   priceChange: 'up' | 'down' | 'neutral';
   logo: string | null;
+  lastUpdated: number;
 }
 
 const CRYPTO_PRICE_APIS: Record<string, string> = {
@@ -33,6 +35,7 @@ export default function CryptoTicker() {
   const [cryptoAddresses, setCryptoAddresses] = useState<CryptoAddress[]>([]);
   const [priceDataMap, setPriceDataMap] = useState<Map<string, PriceData>>(new Map());
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   useEffect(() => {
     const loadCryptoAddresses = async () => {
@@ -69,27 +72,41 @@ export default function CryptoTicker() {
             const data = await res.json();
             const newPrice = data[coinGeckoId]?.usd || 0;
             
-            setPriceDataMap(prev => {
-              const newMap = new Map(prev);
-              const currentData = newMap.get(currency);
-              
-              const previousPrice = currentData?.price || newPrice;
-              
-              let priceChange: 'up' | 'down' | 'neutral' = 'neutral';
-              if (newPrice > previousPrice) {
-                priceChange = 'up';
-              } else if (newPrice < previousPrice) {
-                priceChange = 'down';
-              }
-              
-              newMap.set(currency, {
-                price: newPrice,
-                priceChange,
-                logo: crypto.logoUrl,
+            if (newPrice > 0) {
+              setPriceDataMap(prev => {
+                const newMap = new Map(prev);
+                const currentData = newMap.get(currency);
+                
+                const now = Date.now();
+                const previousPrice = currentData?.price || newPrice;
+                
+                // Determine price change based on comparison with previous price
+                // Only compare if we have a previous price and it's from the last 30 seconds
+                let priceChange: 'up' | 'down' | 'neutral' = 'neutral';
+                
+                if (currentData && (now - currentData.lastUpdated) <= 30000) {
+                  if (newPrice > previousPrice) {
+                    priceChange = 'up';
+                  } else if (newPrice < previousPrice) {
+                    priceChange = 'down';
+                  }
+                }
+                
+                newMap.set(currency, {
+                  price: newPrice,
+                  previousPrice: currentData?.price || newPrice,
+                  priceChange,
+                  logo: crypto.logoUrl,
+                  lastUpdated: now,
+                });
+                
+                return newMap;
               });
               
-              return newMap;
-            });
+              if (isInitialLoad) {
+                setIsInitialLoad(false);
+              }
+            }
           }
         } catch (error) {
           console.error(`Failed to fetch price for ${currency}:`, error);
@@ -100,24 +117,63 @@ export default function CryptoTicker() {
     fetchPrices();
     const interval = setInterval(fetchPrices, 30000); // Update every 30 seconds
     return () => clearInterval(interval);
-  }, [cryptoAddresses]);
+  }, [cryptoAddresses, isInitialLoad]);
 
+  // Rotate through cryptocurrencies - only switch if next crypto has valid data
   useEffect(() => {
     if (cryptoAddresses.length <= 1) return;
 
     const interval = setInterval(() => {
-      setCurrentIndex(prev => (prev + 1) % cryptoAddresses.length);
+      setCurrentIndex(prev => {
+        // Find next crypto with valid price data
+        let nextIndex = (prev + 1) % cryptoAddresses.length;
+        let attempts = 0;
+        
+        while (attempts < cryptoAddresses.length) {
+          const nextCrypto = cryptoAddresses[nextIndex];
+          const nextPriceData = priceDataMap.get(nextCrypto.cryptocurrency.toUpperCase());
+          
+          // Only switch if the next crypto has loaded price data
+          if (nextPriceData && nextPriceData.price > 0) {
+            return nextIndex;
+          }
+          
+          nextIndex = (nextIndex + 1) % cryptoAddresses.length;
+          attempts++;
+        }
+        
+        // If no valid crypto found, keep current
+        return prev;
+      });
     }, 5000); // Rotate every 5 seconds
 
     return () => clearInterval(interval);
-  }, [cryptoAddresses.length]);
+  }, [cryptoAddresses, priceDataMap]);
 
-  if (cryptoAddresses.length === 0) return null;
+  // Don't render until we have crypto addresses and at least one has price data
+  if (cryptoAddresses.length === 0 || isInitialLoad) return null;
 
   const currentCrypto = cryptoAddresses[currentIndex];
   const currentPriceData = priceDataMap.get(currentCrypto.cryptocurrency.toUpperCase());
 
-  if (!currentPriceData) return null;
+  // Keep showing current crypto until we have valid data - don't disappear
+  if (!currentPriceData || currentPriceData.price === 0) {
+    // Try to find any crypto with valid data to display
+    for (let i = 0; i < cryptoAddresses.length; i++) {
+      const crypto = cryptoAddresses[i];
+      const priceData = priceDataMap.get(crypto.cryptocurrency.toUpperCase());
+      if (priceData && priceData.price > 0) {
+        // Found a valid one, update current index
+        if (currentIndex !== i) {
+          setCurrentIndex(i);
+        }
+        // For now, return null and let the state update trigger re-render
+        return null;
+      }
+    }
+    // No valid data at all yet
+    return null;
+  }
 
   return (
     <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/50 border border-border/50">
@@ -136,8 +192,13 @@ export default function CryptoTicker() {
         </div>
       )}
 
+      {/* Crypto Symbol */}
+      <span className="text-xs font-semibold text-foreground">
+        {currentCrypto.cryptocurrency.toUpperCase()}
+      </span>
+
       {/* Price */}
-      <span className="text-xs font-medium tabular-nums">
+      <span className="text-xs font-medium tabular-nums text-muted-foreground">
         ${currentPriceData.price < 1 
           ? currentPriceData.price.toFixed(4)
           : currentPriceData.price.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })

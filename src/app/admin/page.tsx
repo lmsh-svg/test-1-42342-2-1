@@ -147,7 +147,7 @@ export default function AdminDashboard() {
     { title: 'Deposits', icon: Coins, href: '/admin/deposits', color: 'text-green-500' },
     { title: 'Crypto Addresses', icon: Wallet, href: '/admin/crypto-addresses', color: 'text-orange-500' },
     { title: 'Verifications', icon: CheckCircle, href: '/admin/verifications', color: 'text-emerald-500' },
-    { title: 'Support Tickets', icon: TicketCheck, href: '/marketplace/support', color: 'text-pink-500' },
+    { title: 'Support Tickets', icon: TicketCheck, href: '/admin/tickets', color: 'text-pink-500' },
     { title: 'API Management', icon: Settings, href: '/admin/api-management', color: 'text-gray-500' },
   ];
 

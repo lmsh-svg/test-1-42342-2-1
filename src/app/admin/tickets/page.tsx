@@ -8,12 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Package, ArrowLeft, MessageSquare, Send } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Package, ArrowLeft, MessageSquare, Send, Filter } from 'lucide-react';
 
 interface Ticket {
   id: number;
   userId: number;
   subject: string;
+  category: string;
   status: string;
   priority: string;
   createdAt: string;
@@ -23,7 +25,7 @@ interface Ticket {
 interface Message {
   id: number;
   ticketId: number;
-  senderId: number;
+  userId: number;
   message: string;
   createdAt: string;
 }
@@ -38,6 +40,8 @@ export default function AdminTicketsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [replyMessage, setReplyMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'admin')) {
@@ -51,7 +55,11 @@ export default function AdminTicketsPage() {
     try {
       const token = localStorage.getItem('auth_token');
       
-      const response = await fetch('/api/support-tickets?limit=1000', {
+      const params = new URLSearchParams({ limit: '1000' });
+      if (categoryFilter !== 'all') params.append('category', categoryFilter);
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      
+      const response = await fetch(`/api/support-tickets?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
@@ -65,6 +73,12 @@ export default function AdminTicketsPage() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      fetchTickets();
+    }
+  }, [categoryFilter, statusFilter]);
 
   const fetchMessages = async (ticketId: number) => {
     try {
@@ -105,7 +119,7 @@ export default function AdminTicketsPage() {
         },
         body: JSON.stringify({
           ticketId: selectedTicket.id,
-          senderId: user?.id,
+          userId: user?.id,
           message: replyMessage.trim(),
         }),
       });
@@ -152,6 +166,17 @@ export default function AdminTicketsPage() {
     );
   }
 
+  const getCategoryColor = (category: string) => {
+    const colors: Record<string, string> = {
+      technical: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+      billing: 'bg-green-500/10 text-green-600 border-green-500/20',
+      order: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
+      account: 'bg-orange-500/10 text-orange-600 border-orange-500/20',
+      general: 'bg-gray-500/10 text-gray-600 border-gray-500/20',
+    };
+    return colors[category] || colors.general;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
@@ -164,13 +189,46 @@ export default function AdminTicketsPage() {
           Back to Dashboard
         </Button>
 
-        <h1 className="text-3xl font-bold mb-8">Support Tickets</h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">Support Tickets</h1>
+          
+          {/* Filters */}
+          <div className="flex gap-2">
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="technical">Technical</SelectItem>
+                <SelectItem value="billing">Billing</SelectItem>
+                <SelectItem value="order">Order</SelectItem>
+                <SelectItem value="account">Account</SelectItem>
+                <SelectItem value="general">General</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
         {tickets.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <MessageSquare className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-              <p className="text-lg text-muted-foreground">No support tickets yet</p>
+              <p className="text-lg text-muted-foreground">No support tickets found</p>
             </CardContent>
           </Card>
         ) : (
@@ -178,27 +236,32 @@ export default function AdminTicketsPage() {
             {tickets.map((ticket) => (
               <Card key={ticket.id} className="cursor-pointer hover:border-primary transition-colors">
                 <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg line-clamp-1">{ticket.subject}</CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <span className={`text-xs font-medium px-2 py-1 rounded-md border capitalize ${getCategoryColor(ticket.category)}`}>
+                          {ticket.category}
+                        </span>
+                        <Badge variant={ticket.status === 'open' ? 'destructive' : 'default'} className="text-xs">
+                          {ticket.status}
+                        </Badge>
+                      </div>
+                      <CardTitle className="text-base line-clamp-2">{ticket.subject}</CardTitle>
+                      <p className="text-xs text-muted-foreground mt-1">
                         User ID: {ticket.userId}
                       </p>
                     </div>
-                    <Badge variant={ticket.status === 'open' ? 'destructive' : 'default'}>
-                      {ticket.status}
-                    </Badge>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2 mb-4">
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground">Priority:</span>
-                      <span className="font-medium capitalize">{ticket.priority}</span>
+                      <Badge variant="outline" className="text-xs capitalize">{ticket.priority}</Badge>
                     </div>
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground">Created:</span>
-                      <span>{new Date(ticket.createdAt).toLocaleDateString()}</span>
+                      <span className="text-xs">{new Date(ticket.createdAt).toLocaleDateString()}</span>
                     </div>
                   </div>
 
@@ -216,7 +279,10 @@ export default function AdminTicketsPage() {
                       <Button
                         size="sm"
                         variant="default"
-                        onClick={() => handleUpdateStatus(ticket.id, 'closed')}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUpdateStatus(ticket.id, 'closed');
+                        }}
                       >
                         Close
                       </Button>
@@ -231,38 +297,46 @@ export default function AdminTicketsPage() {
 
       {/* Ticket Messages Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <div className="flex justify-between items-start">
-              <div>
-                <DialogTitle>{selectedTicket?.subject}</DialogTitle>
+            <div className="flex justify-between items-start gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  <span className={`text-xs font-medium px-2 py-1 rounded-md border capitalize ${getCategoryColor(selectedTicket?.category || 'general')}`}>
+                    {selectedTicket?.category}
+                  </span>
+                  <Badge variant={selectedTicket?.status === 'open' ? 'destructive' : 'default'}>
+                    {selectedTicket?.status}
+                  </Badge>
+                  <Badge variant="outline">{selectedTicket?.priority}</Badge>
+                </div>
+                <DialogTitle className="text-lg">{selectedTicket?.subject}</DialogTitle>
                 <p className="text-sm text-muted-foreground mt-1">
                   Ticket #{selectedTicket?.id} • User ID: {selectedTicket?.userId}
                 </p>
-              </div>
-              <div className="flex gap-2">
-                <Badge>{selectedTicket?.status}</Badge>
-                <Badge variant="outline">{selectedTicket?.priority}</Badge>
               </div>
             </div>
           </DialogHeader>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto space-y-4 my-4">
+          <div className="flex-1 overflow-y-auto space-y-3 my-4 pr-2">
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`flex ${msg.senderId === user?.id ? 'justify-end' : 'justify-start'}`}
+                className={`flex ${msg.userId === user?.id ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[70%] rounded-lg p-3 ${
-                    msg.senderId === user?.id
+                  className={`max-w-[75%] rounded-xl p-3 shadow-sm ${
+                    msg.userId === user?.id
                       ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted'
+                      : 'bg-muted/80'
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
-                  <p className="text-xs opacity-70 mt-1">
+                  <p className="text-xs font-semibold mb-1.5 opacity-90">
+                    {msg.userId === user?.id ? 'Admin' : `User #${msg.userId}`}
+                  </p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+                  <p className="text-xs opacity-60 mt-2">
                     {new Date(msg.createdAt).toLocaleString()}
                   </p>
                 </div>
@@ -271,12 +345,13 @@ export default function AdminTicketsPage() {
           </div>
 
           {/* Reply Input */}
-          <div className="border-t pt-4 space-y-4">
+          <div className="border-t pt-4 space-y-3">
             <Textarea
               placeholder="Type your reply..."
               value={replyMessage}
               onChange={(e) => setReplyMessage(e.target.value)}
               rows={3}
+              className="resize-none"
             />
             <div className="flex gap-2">
               {selectedTicket?.status === 'open' && (

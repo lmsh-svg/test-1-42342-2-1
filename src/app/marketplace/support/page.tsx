@@ -17,6 +17,7 @@ import { ArrowLeft, MessageSquare, Send, Plus } from 'lucide-react';
 interface Ticket {
   id: number;
   subject: string;
+  category: string;
   status: string;
   priority: string;
   createdAt: string;
@@ -25,7 +26,7 @@ interface Ticket {
 interface Message {
   id: number;
   ticketId: number;
-  senderId: number;
+  userId: number;
   message: string;
   createdAt: string;
 }
@@ -44,6 +45,7 @@ export default function SupportPage() {
   
   const [ticketForm, setTicketForm] = useState({
     subject: '',
+    category: 'general',
     priority: 'medium',
     message: '',
   });
@@ -93,7 +95,7 @@ export default function SupportPage() {
   };
 
   const handleCreateTicket = async () => {
-    if (!ticketForm.subject.trim() || !ticketForm.message.trim()) {
+    if (!ticketForm.subject.trim() || !ticketForm.message.trim() || !ticketForm.category) {
       alert('Please fill in all required fields');
       return;
     }
@@ -111,6 +113,7 @@ export default function SupportPage() {
         body: JSON.stringify({
           userId: user?.id,
           subject: ticketForm.subject,
+          category: ticketForm.category,
           status: 'open',
           priority: ticketForm.priority,
         }),
@@ -128,14 +131,14 @@ export default function SupportPage() {
           },
           body: JSON.stringify({
             ticketId: ticket.id,
-            senderId: user?.id,
+            userId: user?.id,
             message: ticketForm.message,
           }),
         });
 
         setIsNewTicketDialogOpen(false);
         fetchTickets();
-        setTicketForm({ subject: '', priority: 'medium', message: '' });
+        setTicketForm({ subject: '', category: 'general', priority: 'medium', message: '' });
       }
     } catch (error) {
       console.error('Error creating ticket:', error);
@@ -164,7 +167,7 @@ export default function SupportPage() {
         },
         body: JSON.stringify({
           ticketId: selectedTicket.id,
-          senderId: user?.id,
+          userId: user?.id,
           message: newMessage.trim(),
         }),
       });
@@ -191,6 +194,17 @@ export default function SupportPage() {
       </>
     );
   }
+
+  const getCategoryColor = (category: string) => {
+    const colors: Record<string, string> = {
+      technical: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+      billing: 'bg-green-500/10 text-green-600 border-green-500/20',
+      order: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
+      account: 'bg-orange-500/10 text-orange-600 border-orange-500/20',
+      general: 'bg-gray-500/10 text-gray-600 border-gray-500/20',
+    };
+    return colors[category] || colors.general;
+  };
 
   return (
     <>
@@ -222,7 +236,12 @@ export default function SupportPage() {
                 <Card key={ticket.id} className="cursor-pointer hover:border-primary transition-colors">
                   <CardHeader>
                     <div className="flex justify-between items-start">
-                      <div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`text-xs font-medium px-2 py-1 rounded-md border capitalize ${getCategoryColor(ticket.category)}`}>
+                            {ticket.category}
+                          </span>
+                        </div>
                         <CardTitle className="text-lg">{ticket.subject}</CardTitle>
                         <p className="text-sm text-muted-foreground mt-1">
                           Created {new Date(ticket.createdAt).toLocaleDateString()}
@@ -254,11 +273,29 @@ export default function SupportPage() {
 
         {/* New Ticket Dialog */}
         <Dialog open={isNewTicketDialogOpen} onOpenChange={setIsNewTicketDialogOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Create Support Ticket</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
+              <div>
+                <Label htmlFor="category">Category *</Label>
+                <Select
+                  value={ticketForm.category}
+                  onValueChange={(value) => setTicketForm({ ...ticketForm, category: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="technical">Technical Support</SelectItem>
+                    <SelectItem value="billing">Billing & Payments</SelectItem>
+                    <SelectItem value="order">Order Issues</SelectItem>
+                    <SelectItem value="account">Account Management</SelectItem>
+                    <SelectItem value="general">General Inquiry</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div>
                 <Label htmlFor="subject">Subject *</Label>
                 <Input
@@ -281,7 +318,6 @@ export default function SupportPage() {
                     <SelectItem value="low">Low</SelectItem>
                     <SelectItem value="medium">Medium</SelectItem>
                     <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -309,41 +345,46 @@ export default function SupportPage() {
 
         {/* Messages Dialog */}
         <Dialog open={isMessagesDialogOpen} onOpenChange={setIsMessagesDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
             <DialogHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <DialogTitle>{selectedTicket?.subject}</DialogTitle>
+              <div className="flex justify-between items-start gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={`text-xs font-medium px-2 py-1 rounded-md border capitalize ${getCategoryColor(selectedTicket?.category || 'general')}`}>
+                      {selectedTicket?.category}
+                    </span>
+                    <Badge variant={selectedTicket?.status === 'open' ? 'destructive' : 'default'}>
+                      {selectedTicket?.status}
+                    </Badge>
+                    <Badge variant="outline">{selectedTicket?.priority}</Badge>
+                  </div>
+                  <DialogTitle className="text-lg">{selectedTicket?.subject}</DialogTitle>
                   <p className="text-sm text-muted-foreground mt-1">
                     Ticket #{selectedTicket?.id}
                   </p>
-                </div>
-                <div className="flex gap-2">
-                  <Badge>{selectedTicket?.status}</Badge>
-                  <Badge variant="outline">{selectedTicket?.priority}</Badge>
                 </div>
               </div>
             </DialogHeader>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto space-y-4 my-4">
+            <div className="flex-1 overflow-y-auto space-y-3 my-4 pr-2">
               {messages.map((msg) => (
                 <div
                   key={msg.id}
-                  className={`flex ${msg.senderId === user?.id ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${msg.userId === user?.id ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-[70%] rounded-lg p-3 ${
-                      msg.senderId === user?.id
+                    className={`max-w-[75%] rounded-xl p-3 shadow-sm ${
+                      msg.userId === user?.id
                         ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted'
+                        : 'bg-muted/80'
                     }`}
                   >
-                    <p className="text-sm font-medium mb-1">
-                      {msg.senderId === user?.id ? 'You' : 'Support Team'}
+                    <p className="text-xs font-semibold mb-1.5 opacity-90">
+                      {msg.userId === user?.id ? 'You' : 'Support Team'}
                     </p>
-                    <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
-                    <p className="text-xs opacity-70 mt-1">
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+                    <p className="text-xs opacity-60 mt-2">
                       {new Date(msg.createdAt).toLocaleString()}
                     </p>
                   </div>
@@ -353,12 +394,13 @@ export default function SupportPage() {
 
             {/* Reply Input */}
             {selectedTicket?.status === 'open' && (
-              <div className="border-t pt-4 space-y-4">
+              <div className="border-t pt-4 space-y-3">
                 <Textarea
                   placeholder="Type your message..."
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   rows={3}
+                  className="resize-none"
                 />
                 <div className="flex justify-end">
                   <Button
@@ -369,6 +411,13 @@ export default function SupportPage() {
                     {isSending ? 'Sending...' : 'Send Message'}
                   </Button>
                 </div>
+              </div>
+            )}
+            {selectedTicket?.status !== 'open' && (
+              <div className="border-t pt-4">
+                <p className="text-sm text-muted-foreground text-center">
+                  This ticket is {selectedTicket?.status}. No new messages can be added.
+                </p>
               </div>
             )}
           </DialogContent>
