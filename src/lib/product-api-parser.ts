@@ -21,6 +21,24 @@ export interface RawProduct {
   [key: string]: any; // Allow for additional fields
 }
 
+// NEW: Support for nested API structure
+export interface RawAPIResponse {
+  lastUpdated?: number;
+  nextUpdate?: number;
+  imagePathPrefix?: string;
+  imageSizeVariants?: number[];
+  data?: Array<{
+    name?: string;
+    desc?: string;
+    brand?: string | null;
+    tags?: string[];
+    imgs?: Record<string, string>;
+    cat?: string | null;
+    products?: RawProduct[];
+  }>;
+  products?: RawProduct[]; // Alternative flat structure
+}
+
 export interface ParsedProduct {
   sourceId: string;
   name: string;
@@ -40,6 +58,55 @@ export interface ParsedPricingTier {
   minQuantity: number;
   price: number;
   quantityLabel: string; // "1+", "3+", etc.
+}
+
+/**
+ * Extract flat product list from nested API structure
+ */
+export function extractProductsFromAPI(apiResponse: RawAPIResponse | RawProduct[]): RawProduct[] {
+  // Handle direct array format
+  if (Array.isArray(apiResponse)) {
+    return apiResponse;
+  }
+
+  const products: RawProduct[] = [];
+
+  // Handle nested data[].products[] structure
+  if (apiResponse.data && Array.isArray(apiResponse.data)) {
+    for (const dataItem of apiResponse.data) {
+      if (dataItem.products && Array.isArray(dataItem.products)) {
+        // Merge parent-level data into each product
+        for (const product of dataItem.products) {
+          products.push({
+            ...product,
+            // Inherit from parent if not set in child
+            brand: product.brand || dataItem.brand || undefined,
+            tags: product.tags && product.tags.length > 0 ? product.tags : dataItem.tags || [],
+            desc: product.desc || dataItem.desc || undefined,
+          });
+        }
+      }
+    }
+    
+    console.log(`Extracted ${products.length} products from nested data structure`);
+    return products;
+  }
+
+  // Handle flat products array
+  if (apiResponse.products && Array.isArray(apiResponse.products)) {
+    console.log(`Extracted ${apiResponse.products.length} products from flat structure`);
+    return apiResponse.products;
+  }
+
+  console.warn('No products found in API response. Structure:', {
+    hasData: !!apiResponse.data,
+    dataIsArray: Array.isArray(apiResponse.data),
+    hasProducts: !!apiResponse.products,
+    productsIsArray: Array.isArray(apiResponse.products),
+    keys: Object.keys(apiResponse)
+  });
+
+  return [];
 }
 
 /**
@@ -96,7 +163,7 @@ export function assignCategory(product: RawProduct): { main: string; sub: string
     { keywords: ['topical', 'lotion', 'balm', 'cream', 'salve', 'bath', 'bath bomb'], main: 'Topicals', sub: null },
     
     // Accessories
-    { keywords: ['grinder', 'pipe', 'bong', 'paper', 'rolling', 'lighter', 'tray', 'accessory'], main: 'Accessories', sub: null },
+    { keywords: ['grinder', 'pipe', 'bong', 'paper', 'rolling', 'lighter', 'tray', 'accessory', 'battery', 'torch'], main: 'Accessories', sub: null },
   ];
 
   for (const { keywords, main, sub } of categoryMap) {

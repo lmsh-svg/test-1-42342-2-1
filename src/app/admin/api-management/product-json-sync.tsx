@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Upload, CheckCircle2, AlertCircle, Loader2, Package } from 'lucide-react';
 import { toast } from 'sonner';
-import { parseProducts, type RawProduct, type ParsedProduct } from '@/lib/product-api-parser';
+import { parseProducts, extractProductsFromAPI, type ParsedProduct } from '@/lib/product-api-parser';
 
 interface ProductJSONSyncProps {
   apiConfigId: number;
@@ -36,28 +36,18 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
       // Parse the JSON input
       const parsed = JSON.parse(jsonInput);
       
-      // Extract products array (handle different JSON structures)
-      let rawProducts: RawProduct[];
-      
-      if (Array.isArray(parsed)) {
-        rawProducts = parsed;
-      } else if (parsed.products && Array.isArray(parsed.products)) {
-        rawProducts = parsed.products;
-      } else if (parsed.data && Array.isArray(parsed.data)) {
-        rawProducts = parsed.data;
-      } else {
-        throw new Error('Invalid JSON structure. Expected an array of products or an object with a "products" or "data" array.');
-      }
+      // Extract products using the new extraction function
+      const rawProducts = extractProductsFromAPI(parsed);
 
       if (rawProducts.length === 0) {
-        throw new Error('No products found in JSON');
+        throw new Error('No products found in JSON. Make sure your JSON contains either a "data" array with nested "products" arrays, or a flat "products" array.');
       }
 
       // Use the parser to process products
       const parsedProducts = parseProducts(rawProducts);
       
       setParseResults(parsedProducts);
-      toast.success(`Successfully parsed ${parsedProducts.length} products (deduplicated from ${rawProducts.length})`);
+      toast.success(`Successfully parsed ${parsedProducts.length} products from ${rawProducts.length} raw entries`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to parse JSON';
       setError(errorMessage);
