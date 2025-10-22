@@ -93,14 +93,17 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
         body: JSON.stringify(requestBody),
       });
 
+      // CRITICAL FIX: Handle non-JSON responses (HTML error pages, timeouts, etc.)
       const contentType = response.headers.get('Content-Type') || '';
       let data: any;
 
       if (contentType.includes('application/json')) {
         data = await response.json();
       } else {
+        // Server returned HTML or plain text (error page, timeout, etc.)
         const text = await response.text();
-        throw new Error(text || 'Sync failed (non-JSON response)');
+        console.error('Non-JSON response from server:', text.substring(0, 500));
+        throw new Error('Server error: Request timed out or returned invalid response. Please try with fewer products or check your API JSON format.');
       }
 
       if (!response.ok) {

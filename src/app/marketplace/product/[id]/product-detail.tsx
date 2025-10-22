@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ShoppingCart, Package, Minus, Plus, CheckCircle2, AlertCircle, ChevronRight, TrendingDown, Percent } from 'lucide-react';
+import { ChevronLeft, ShoppingCart, Package, Minus, Plus, CheckCircle2, AlertCircle, ChevronRight, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/use-auth';
 import { ProductReviews } from '@/components/marketplace/product-reviews';
@@ -96,7 +96,7 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
   const [thumbnailStartIndex, setThumbnailStartIndex] = useState(0);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [pricingTiers, setPricingTiers] = useState<PricingTier[]>([]);
-  const [selectedTierQuantity, setSelectedTierQuantity] = useState<number>(1);
+  const [showAllTiers, setShowAllTiers] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -577,80 +577,59 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
             </div>
           </div>
 
-          {/* PRICING SECTION - CLEAN TIER DROPDOWN */}
+          {/* PRICING SECTION - EXPANDABLE LIST (NOT SELECTOR!) */}
           <div className="border-b pb-6">
             {pricingTiers.length > 1 ? (
               <div className="space-y-4">
-                {/* Simple Price Display with Tier Dropdown */}
-                <div className="space-y-3">
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-sm text-muted-foreground">Starts at</span>
-                    <span className="text-4xl font-bold text-primary">
-                      ${pricingTiers[0].pricePerUnit.toFixed(2)}
-                    </span>
-                    <span className="text-sm text-muted-foreground">per unit</span>
-                  </div>
+                {/* Simple Price Display */}
+                <div className="flex items-baseline gap-3">
+                  <span className="text-sm text-muted-foreground">Starts at</span>
+                  <span className="text-4xl font-bold text-primary">
+                    ${pricingTiers[0].pricePerUnit.toFixed(2)}
+                  </span>
+                  <span className="text-sm text-muted-foreground">per unit</span>
+                </div>
 
-                  {/* Tier Selection Dropdown */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Select Pricing Tier:</label>
-                    <Select 
-                      value={selectedTierQuantity.toString()} 
-                      onValueChange={handleTierChange}
-                    >
-                      <SelectTrigger className="h-14 border-2">
-                        <SelectValue>
-                          <div className="flex items-center justify-between w-full pr-4">
-                            <span className="font-semibold text-lg">{selectedTierQuantity}+ Units</span>
+                {/* EXPANDABLE TIER LIST (NOT A SELECTOR) */}
+                <div className="space-y-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowAllTiers(!showAllTiers)}
+                    className="w-full justify-between h-auto py-3"
+                  >
+                    <span className="text-sm font-medium">
+                      {showAllTiers ? 'Hide' : 'View'} All Pricing Tiers ({pricingTiers.length})
+                    </span>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${showAllTiers ? 'rotate-180' : ''}`} />
+                  </Button>
+
+                  {showAllTiers && (
+                    <div className="border rounded-lg divide-y">
+                      {pricingTiers.map((tier) => (
+                        <div 
+                          key={tier.minQuantity}
+                          className="p-3 hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-6">
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-base">{tier.quantity}</span>
+                              {tier.savings > 0 && (
+                                <span className="text-xs text-green-600 font-medium">
+                                  Save ${tier.savings.toFixed(2)} per order
+                                </span>
+                              )}
+                            </div>
                             <div className="text-right">
-                              <div className="font-bold text-primary text-lg">
-                                ${pricingTiers.find(t => t.minQuantity === selectedTierQuantity)?.pricePerUnit.toFixed(2)}
+                              <div className="font-bold text-primary text-base">
+                                ${tier.pricePerUnit.toFixed(2)}
                               </div>
                               <div className="text-xs text-muted-foreground">
                                 per unit
                               </div>
                             </div>
                           </div>
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {pricingTiers.map((tier) => (
-                          <SelectItem 
-                            key={tier.minQuantity} 
-                            value={tier.minQuantity.toString()}
-                            className="py-3"
-                          >
-                            <div className="flex items-center justify-between w-full gap-6">
-                              <div className="flex flex-col">
-                                <span className="font-semibold text-base">{tier.quantity}</span>
-                                {tier.savings > 0 && (
-                                  <span className="text-xs text-green-600 font-medium">
-                                    Save ${tier.savings.toFixed(2)} per order
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-right">
-                                <div className="font-bold text-primary text-base">
-                                  ${tier.pricePerUnit.toFixed(2)}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  per unit
-                                </div>
-                              </div>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Savings Badge */}
-                  {pricingTiers.find(t => t.minQuantity === selectedTierQuantity)?.savings! > 0 && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <TrendingDown className="h-4 w-4 text-green-600" />
-                      <span className="text-green-600 font-semibold">
-                        You save ${pricingTiers.find(t => t.minQuantity === selectedTierQuantity)?.savings.toFixed(2)} when buying {selectedTierQuantity}+
-                      </span>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -786,8 +765,8 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => setQuantity(Math.max(selectedTierQuantity, quantity - 1))}
-                  disabled={quantity <= selectedTierQuantity || isAddingToCart}
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  disabled={quantity <= 1 || isAddingToCart}
                 >
                   <Minus className="h-4 w-4" />
                 </Button>
