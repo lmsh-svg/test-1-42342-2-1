@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { products, productImages, bulkPricingRules, apiConfigurations } from '@/db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { products, productImages, bulkPricingRules, productVariants, apiConfigurations } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { apiConfigId, products: requestProducts } = body;
 
-    // Validate request body
     if (!apiConfigId || typeof apiConfigId !== 'number' || apiConfigId <= 0) {
       return NextResponse.json({ 
         error: "Valid apiConfigId is required",
@@ -40,10 +39,10 @@ export async function POST(request: NextRequest) {
     let productsUpdated = 0;
     let tiersCreated = 0;
     let imagesCreated = 0;
+    let variantsCreated = 0;
 
     // Process each product
     for (const product of requestProducts) {
-      // Extract sourceId (use product name as fallback)
       const sourceId = product.sourceId || product.id || product.name;
       
       if (!sourceId) {
@@ -71,7 +70,7 @@ export async function POST(request: NextRequest) {
           subCategory: product.subCategory || null,
           brand: product.brand || null,
           volume: product.volume || null,
-          stockQuantity: 100,
+          stockQuantity: product.stockQuantity || 0,
           isAvailable: true,
           sourceType: 'api',
           sourceId: sourceId.toString(),
@@ -100,7 +99,7 @@ export async function POST(request: NextRequest) {
           subCategory: product.subCategory || existingProduct[0].subCategory,
           brand: product.brand || existingProduct[0].brand,
           volume: product.volume || existingProduct[0].volume,
-          stockQuantity: 100,
+          stockQuantity: product.stockQuantity || existingProduct[0].stockQuantity,
           isAvailable: true
         };
 
@@ -108,17 +107,20 @@ export async function POST(request: NextRequest) {
           .set(updateData)
           .where(eq(products.id, productId));
 
-        // Delete existing related records
+        // Delete existing related records for clean update
         await db.delete(productImages)
           .where(eq(productImages.productId, productId));
 
         await db.delete(bulkPricingRules)
           .where(eq(bulkPricingRules.productId, productId));
 
+        await db.delete(productVariants)
+          .where(eq(productVariants.productId, productId));
+
         productsUpdated++;
       }
 
-      // Insert product images if available
+      // Insert product images
       if (product.images && Array.isArray(product.images) && product.images.length > 0) {
         for (let i = 0; i < product.images.length; i++) {
           const imageUrl = product.images[i];
@@ -135,36 +137,54 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Insert bulk pricing tiers if available
-      if (product.pricingTiers && Array.isArray(product.pricingTiers) && product.pricingTiers.length > 0) {
-        for (const tier of product.pricingTiers) {
-          if (tier.minQuantity !== undefined && tier.price !== undefined) {
-            await db.insert(bulkPricingRules).values({
+      // Insert product variants (NEW!)
+      if (product.variants && Array.isArray(product.variants) && product.variants.length > 0) {
+        for (const variant of product.variants) {
+          if (variant.variantName) {
+            const [insertedVariant] = await db.insert(productVariants).values({
               productId: productId,
-              minQuantity: tier.minQuantity,
-              discountType: 'fixed_price',
-              discountValue: 0,
-              finalPrice: tier.price,
+              variantName: variant.variantName,
+              variantType: variant.variantType || 'option',
+              stockQuantity: variant.stockQuantity || 0,
+              priceModifier: variant.priceModifier || 0,
+              isAvailable: variant.isAvailable !== false,
               createdAt: new Date().toISOString()
-            });
-            tiersCreated++;
+            }).returning();
+            variantsCreated++;
+
+            // Insert variant-specific tiers
+            if (variant.tiers && Array.isArray(variant.tiers) && variant.tiers.length > 0) {
+              for (const tier of variant.tiers) {
+                if (tier.minQuantity !== undefined && tier.price !== undefined) {
+                  await db.insert(bulkPricingRules).values({
+                    productId: productId,
+                    minQuantity: tier.minQuantity,
+                    discountType: 'fixed_price',
+                    discountValue: 0,
+                    finalPrice: tier.price,
+                    createdAt: new Date().toISOString()
+                  });
+                  tiersCreated++;
+                }
+              }
+            }
           }
         }
-      }
-
-      // Alternative tier structure support (tiers with different field names)
-      if (product.tiers && Array.isArray(product.tiers) && product.tiers.length > 0) {
-        for (const tier of product.tiers) {
-          if (tier.minQuantity !== undefined && tier.price !== undefined) {
-            await db.insert(bulkPricingRules).values({
-              productId: productId,
-              minQuantity: tier.minQuantity,
-              discountType: 'fixed_price',
-              discountValue: 0,
-              finalPrice: tier.price,
-              createdAt: new Date().toISOString()
-            });
-            tiersCreated++;
+      } else {
+        // No variants - insert base product tiers
+        if (product.pricingTiers && Array.isArray(product.pricingTiers) && product.pricingTiers.length > 0) {
+          for (const tier of product.pricingTiers) {
+            if (tier.minQuantity !== undefined && tier.price !== undefined) {
+              await db.insert(bulkPricingRules).values({
+                productId: productId,
+                minQuantity: tier.minQuantity,
+                discountType: 'fixed_price',
+                discountValue: 0,
+                finalPrice: tier.price,
+                createdAt: new Date().toISOString()
+              });
+              tiersCreated++;
+            }
           }
         }
       }
@@ -176,7 +196,8 @@ export async function POST(request: NextRequest) {
       productsUpdated,
       tiersCreated,
       imagesCreated,
-      message: `Successfully synced ${productsCreated + productsUpdated} products (${productsCreated} created, ${productsUpdated} updated) with ${tiersCreated} pricing tiers and ${imagesCreated} images`
+      variantsCreated,
+      message: `Successfully synced ${productsCreated + productsUpdated} products (${productsCreated} created, ${productsUpdated} updated) with ${variantsCreated} variants, ${tiersCreated} pricing tiers, and ${imagesCreated} images`
     }, { status: 201 });
 
   } catch (error) {

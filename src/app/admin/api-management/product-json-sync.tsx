@@ -24,6 +24,7 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
     productsUpdated: number;
     tiersCreated: number;
     imagesCreated: number;
+    variantsCreated?: number;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,21 +34,24 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
     setSyncResults(null);
 
     try {
-      // Parse the JSON input
       const parsed = JSON.parse(jsonInput);
       
-      // Extract products using the new extraction function
-      const rawProducts = extractProductsFromAPI(parsed);
+      // Extract products with parent/variant structure
+      const extractedData = extractProductsFromAPI(parsed);
 
-      if (rawProducts.length === 0) {
+      if (extractedData.length === 0) {
         throw new Error('No products found in JSON. Make sure your JSON contains either a "data" array with nested "products" arrays, or a flat "products" array.');
       }
 
-      // Use the parser to process products
-      const parsedProducts = parseProducts(rawProducts);
+      // Parse products with variant support
+      const parsedProducts = parseProducts(extractedData);
       
       setParseResults(parsedProducts);
-      toast.success(`Successfully parsed ${parsedProducts.length} products from ${rawProducts.length} raw entries`);
+      
+      const totalVariants = parsedProducts.reduce((sum, p) => sum + p.variants.length, 0);
+      toast.success(
+        `Successfully parsed ${parsedProducts.length} products with ${totalVariants} total variants from ${extractedData.length} raw entries`
+      );
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to parse JSON';
       setError(errorMessage);
@@ -86,10 +90,9 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
       toast.success(
         `Successfully synced ${data.productsCreated + data.productsUpdated} products! ` +
         `(${data.productsCreated} created, ${data.productsUpdated} updated, ` +
-        `${data.tiersCreated} tiers, ${data.imagesCreated} images)`
+        `${data.variantsCreated || 0} variants, ${data.tiersCreated} tiers, ${data.imagesCreated} images)`
       );
 
-      // Clear form after successful sync
       setJsonInput('');
       setParseResults(null);
       
@@ -126,17 +129,18 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
           <CardDescription>
             Paste your Product API JSON below. The system will automatically:
             <ul className="list-disc list-inside mt-2 space-y-1">
-              <li>Deduplicate products by ID and name</li>
+              <li><strong>Parse parent products with variants</strong> (colors, flavors, strains)</li>
               <li>Assign categories based on tags, description, and brand</li>
               <li>Parse pricing tiers (1+, 3+, 5+, etc.)</li>
               <li>Extract product images</li>
-              <li>Sort products alphabetically within categories</li>
+              <li>Store variants in productVariants table</li>
+              <li>Sort products alphabetically</li>
             </ul>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Textarea
-            placeholder='Paste your Product API JSON here...&#10;&#10;Example:&#10;[&#10;  {&#10;    "id": 123,&#10;    "name": "Product Name",&#10;    "price": 29.99,&#10;    "tiers": [&#10;      { "qty": "1+", "price": 29.99 },&#10;      { "qty": "3+", "price": 27.99 }&#10;    ],&#10;    "tags": ["Strain Type = Indica"],&#10;    "desc": "Product description",&#10;    "images": []&#10;  }&#10;]'
+            placeholder='Paste your Product API JSON here (full API response with data[], lastUpdated, etc.)...'
             value={jsonInput}
             onChange={(e) => setJsonInput(e.target.value)}
             className="font-mono text-xs min-h-[300px]"
@@ -184,9 +188,10 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
               <CheckCircle2 className="h-4 w-4" />
               <AlertDescription>
                 <div className="font-semibold mb-2">Sync Complete!</div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
                   <div>Created: <strong>{syncResults.productsCreated}</strong></div>
                   <div>Updated: <strong>{syncResults.productsUpdated}</strong></div>
+                  <div>Variants: <strong>{syncResults.variantsCreated || 0}</strong></div>
                   <div>Tiers: <strong>{syncResults.tiersCreated}</strong></div>
                   <div>Images: <strong>{syncResults.imagesCreated}</strong></div>
                 </div>
@@ -255,6 +260,23 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
                         )}
                       </div>
                     </div>
+
+                    {/* Variants */}
+                    {product.variants.length > 0 && (
+                      <div className="pl-6 text-xs space-y-1">
+                        <p className="font-medium text-muted-foreground">
+                          Variants ({product.variants.length}):
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {product.variants.map((variant, vIndex) => (
+                            <Badge key={vIndex} variant="outline" className="text-xs">
+                              {variant.variantName}
+                              {variant.priceModifier !== 0 && ` (+$${variant.priceModifier.toFixed(2)})`}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Pricing Tiers */}
                     {product.pricingTiers.length > 0 && (

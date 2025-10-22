@@ -1,6 +1,7 @@
 /**
  * Product API Parser
  * Comprehensive parsing logic for external product API JSON format
+ * NOW SUPPORTS: Parent products with variants (colors, flavors, strains)
  */
 
 export interface RawProductTier {
@@ -21,29 +22,39 @@ export interface RawProduct {
   [key: string]: any; // Allow for additional fields
 }
 
-// NEW: Support for nested API structure
+// NEW: Support for nested API structure with parent/variant relationships
 export interface RawAPIResponse {
   lastUpdated?: number;
   nextUpdate?: number;
   imagePathPrefix?: string;
   imageSizeVariants?: number[];
   data?: Array<{
-    name?: string;
-    desc?: string;
+    name?: string; // PARENT product name
+    desc?: string; // PARENT description
     brand?: string | null;
     tags?: string[];
     imgs?: Record<string, string>;
     cat?: string | null;
-    products?: RawProduct[];
+    products?: RawProduct[]; // CHILD variants
   }>;
   products?: RawProduct[]; // Alternative flat structure
+}
+
+export interface ParsedVariant {
+  variantName: string;
+  variantType: string; // "color", "flavor", "strain", "size"
+  stockQuantity: number;
+  priceModifier: number; // Difference from base price
+  isAvailable: boolean;
+  sourceId: string;
+  tiers: ParsedPricingTier[];
 }
 
 export interface ParsedProduct {
   sourceId: string;
   name: string;
   description: string | null;
-  price: number;
+  price: number; // Base price (lowest variant price)
   imageUrl: string | null;
   images: string[];
   mainCategory: string;
@@ -51,7 +62,8 @@ export interface ParsedProduct {
   brand: string | null;
   volume: string | null;
   stockQuantity: number;
-  pricingTiers: ParsedPricingTier[];
+  pricingTiers: ParsedPricingTier[]; // Base product tiers
+  variants: ParsedVariant[]; // NEW: Product variants
 }
 
 export interface ParsedPricingTier {
@@ -61,41 +73,118 @@ export interface ParsedPricingTier {
 }
 
 /**
- * Extract flat product list from nested API structure
+ * Determine variant type from context
  */
-export function extractProductsFromAPI(apiResponse: RawAPIResponse | RawProduct[]): RawProduct[] {
-  // Handle direct array format
-  if (Array.isArray(apiResponse)) {
-    return apiResponse;
+function detectVariantType(variantName: string, parentData: { tags?: string[]; desc?: string; brand?: string }): string {
+  const name = variantName.toLowerCase();
+  const context = [
+    ...(parentData.tags || []),
+    parentData.desc || '',
+    parentData.brand || ''
+  ].join(' ').toLowerCase();
+
+  // Color variants
+  const colors = ['black', 'white', 'red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink', 'grey', 'gray', 'silver', 'gold', 'brown', 'cream'];
+  if (colors.some(color => name.includes(color))) {
+    return 'color';
   }
 
-  const products: RawProduct[] = [];
+  // Strain variants (cannabis)
+  if (parentData.tags?.some(tag => tag.toLowerCase().includes('strain'))) {
+    return 'strain';
+  }
+
+  // Flavor variants
+  const flavorWords = ['flavor', 'taste', 'berry', 'mint', 'vanilla', 'chocolate', 'cherry', 'grape', 'lemon'];
+  if (flavorWords.some(word => name.includes(word) || context.includes(word))) {
+    return 'flavor';
+  }
+
+  // Size variants
+  const sizeWords = ['small', 'medium', 'large', 'xl', 'mini', 'regular', 'oz', 'ml', 'g', 'mg'];
+  if (sizeWords.some(word => name.includes(word))) {
+    return 'size';
+  }
+
+  // Default to generic "option"
+  return 'option';
+}
+
+/**
+ * Extract flat product list from nested API structure
+ * NOW PROPERLY HANDLES PARENT/VARIANT RELATIONSHIPS
+ */
+export function extractProductsFromAPI(apiResponse: RawAPIResponse | RawProduct[]): Array<{
+  parent: {
+    name: string;
+    desc?: string;
+    brand?: string | null;
+    tags?: string[];
+    imgs?: Record<string, string>;
+    cat?: string | null;
+  };
+  variants: RawProduct[];
+}> {
+  const results: Array<{ parent: any; variants: RawProduct[] }> = [];
+
+  // Handle direct array format (flat products, no variants)
+  if (Array.isArray(apiResponse)) {
+    // Each product is standalone
+    for (const product of apiResponse) {
+      results.push({
+        parent: {
+          name: product.name,
+          desc: product.desc,
+          brand: product.brand,
+          tags: product.tags,
+          imgs: {},
+          cat: null
+        },
+        variants: [product]
+      });
+    }
+    return results;
+  }
 
   // Handle nested data[].products[] structure
   if (apiResponse.data && Array.isArray(apiResponse.data)) {
     for (const dataItem of apiResponse.data) {
       if (dataItem.products && Array.isArray(dataItem.products)) {
-        // Merge parent-level data into each product
-        for (const product of dataItem.products) {
-          products.push({
-            ...product,
-            // Inherit from parent if not set in child
-            brand: product.brand || dataItem.brand || undefined,
-            tags: product.tags && product.tags.length > 0 ? product.tags : dataItem.tags || [],
-            desc: product.desc || dataItem.desc || undefined,
-          });
-        }
+        results.push({
+          parent: {
+            name: dataItem.name || 'Unnamed Product',
+            desc: dataItem.desc,
+            brand: dataItem.brand,
+            tags: dataItem.tags,
+            imgs: dataItem.imgs,
+            cat: dataItem.cat
+          },
+          variants: dataItem.products
+        });
       }
     }
     
-    console.log(`Extracted ${products.length} products from nested data structure`);
-    return products;
+    console.log(`Extracted ${results.length} parent products with variants from nested data structure`);
+    return results;
   }
 
-  // Handle flat products array
+  // Handle flat products array (no variants)
   if (apiResponse.products && Array.isArray(apiResponse.products)) {
-    console.log(`Extracted ${apiResponse.products.length} products from flat structure`);
-    return apiResponse.products;
+    for (const product of apiResponse.products) {
+      results.push({
+        parent: {
+          name: product.name,
+          desc: product.desc,
+          brand: product.brand,
+          tags: product.tags,
+          imgs: {},
+          cat: null
+        },
+        variants: [product]
+      });
+    }
+    console.log(`Extracted ${results.length} products from flat structure`);
+    return results;
   }
 
   console.warn('No products found in API response. Structure:', {
@@ -111,9 +200,8 @@ export function extractProductsFromAPI(apiResponse: RawAPIResponse | RawProduct[
 
 /**
  * Category Assignment Logic
- * Determines category based on tags, description, brand, and name
  */
-export function assignCategory(product: RawProduct): { main: string; sub: string | null } {
+export function assignCategory(product: { tags?: string[]; desc?: string; brand?: string; name?: string }): { main: string; sub: string | null } {
   const searchText = [
     ...(product.tags || []),
     product.desc || '',
@@ -126,7 +214,6 @@ export function assignCategory(product: RawProduct): { main: string; sub: string
     for (const tag of product.tags) {
       const tagLower = tag.toLowerCase();
       
-      // Check for strain types
       if (tagLower.includes('strain type = indica')) {
         return { main: 'Flower', sub: 'Indica' };
       }
@@ -141,28 +228,13 @@ export function assignCategory(product: RawProduct): { main: string; sub: string
 
   // Category inference from product content
   const categoryMap: Array<{ keywords: string[]; main: string; sub?: string }> = [
-    // Pre Rolls
     { keywords: ['pre roll', 'pre-roll', 'preroll', 'joint', 'blunt'], main: 'Pre Rolls', sub: null },
-    
-    // Cartridges
     { keywords: ['cartridge', 'cart', 'vape cart', '510 thread'], main: 'Cartridges', sub: null },
-    
-    // Disposables
     { keywords: ['disposable', 'disposable vape', 'puff bar', 'disposable pen'], main: 'Disposables', sub: null },
-    
-    // Concentrates
     { keywords: ['liquid diamonds', 'concentrate', 'wax', 'shatter', 'budder', 'crumble', 'rosin', 'resin', 'distillate', 'sauce'], main: 'Concentrates', sub: null },
-    
-    // Edibles
     { keywords: ['edible', 'gummies', 'gummy', 'chocolate', 'candy', 'brownie', 'cookie', 'beverage'], main: 'Edibles', sub: null },
-    
-    // Flower
     { keywords: ['flower', 'bud', 'eighth', '1/8', 'quarter', '1/4', 'half ounce', 'ounce'], main: 'Flower', sub: null },
-    
-    // Topicals
     { keywords: ['topical', 'lotion', 'balm', 'cream', 'salve', 'bath', 'bath bomb'], main: 'Topicals', sub: null },
-    
-    // Accessories
     { keywords: ['grinder', 'pipe', 'bong', 'paper', 'rolling', 'lighter', 'tray', 'accessory', 'battery', 'torch'], main: 'Accessories', sub: null },
   ];
 
@@ -174,27 +246,24 @@ export function assignCategory(product: RawProduct): { main: string; sub: string
     }
   }
 
-  // Default to Miscellaneous if no category determined
   return { main: 'Miscellaneous', sub: null };
 }
 
 /**
- * Extract volume information from product name/description
+ * Extract volume information
  */
-export function extractVolume(product: RawProduct): string | null {
-  const searchText = `${product.name} ${product.desc || ''}`.toLowerCase();
-  
+export function extractVolume(text: string): string | null {
   const volumePatterns = [
     /(\d+\.?\d*)\s*(g|gram|grams)/i,
     /(\d+\.?\d*)\s*(mg|milligram|milligrams)/i,
     /(\d+\.?\d*)\s*(ml|milliliter|milliliters)/i,
     /(\d+\.?\d*)\s*(oz|ounce|ounces)/i,
     /(\d+)\s*(pack|ct|count)/i,
-    /(\d+\.?\d*)(g|mg|ml)/i, // Compact format
+    /(\d+\.?\d*)(g|mg|ml)/i,
   ];
 
   for (const pattern of volumePatterns) {
-    const match = searchText.match(pattern);
+    const match = text.match(pattern);
     if (match) {
       return match[0].trim();
     }
@@ -204,16 +273,15 @@ export function extractVolume(product: RawProduct): string | null {
 }
 
 /**
- * Parse pricing tiers from API format
+ * Parse pricing tiers
  */
-export function parsePricingTiers(product: RawProduct): ParsedPricingTier[] {
-  if (!product.tiers || product.tiers.length === 0) {
+export function parsePricingTiers(tiers?: RawProductTier[]): ParsedPricingTier[] {
+  if (!tiers || tiers.length === 0) {
     return [];
   }
 
-  const tiers = product.tiers
+  return tiers
     .map(tier => {
-      // Parse quantity from strings like "1+", "3+", "10+"
       const qtyMatch = tier.qty.match(/(\d+)\+?/);
       const minQuantity = qtyMatch ? parseInt(qtyMatch[1]) : 1;
 
@@ -223,105 +291,75 @@ export function parsePricingTiers(product: RawProduct): ParsedPricingTier[] {
         quantityLabel: tier.qty
       };
     })
-    .sort((a, b) => a.minQuantity - b.minQuantity); // Sort by quantity ascending
-
-  return tiers;
+    .sort((a, b) => a.minQuantity - b.minQuantity);
 }
 
 /**
- * Deduplicate products by ID first, then by name
+ * Main parser function - NOW HANDLES VARIANTS PROPERLY
  */
-export function deduplicateProducts(products: RawProduct[]): RawProduct[] {
-  const uniqueById = new Map<number, RawProduct>();
-  const uniqueByName = new Map<string, RawProduct>();
+export function parseProducts(rawData: Array<{ parent: any; variants: RawProduct[] }>): ParsedProduct[] {
+  const parsedProducts: ParsedProduct[] = [];
 
-  for (const product of products) {
-    // Check by ID first
-    if (product.id) {
-      const existing = uniqueById.get(product.id);
-      if (!existing) {
-        uniqueById.set(product.id, product);
-      } else {
-        // Keep the one with more tiers or longer description
-        const currentTierCount = product.tiers?.length || 0;
-        const existingTierCount = existing.tiers?.length || 0;
-        const currentDescLength = product.desc?.length || 0;
-        const existingDescLength = existing.desc?.length || 0;
+  for (const { parent, variants } of rawData) {
+    // Get category from parent data
+    const category = assignCategory({
+      tags: parent.tags,
+      desc: parent.desc,
+      brand: parent.brand,
+      name: parent.name
+    });
 
-        if (currentTierCount > existingTierCount || 
-            (currentTierCount === existingTierCount && currentDescLength > existingDescLength)) {
-          uniqueById.set(product.id, product);
-        }
-      }
+    // Get parent-level images
+    const parentImages: string[] = [];
+    if (parent.imgs && typeof parent.imgs === 'object') {
+      parentImages.push(...Object.values(parent.imgs));
     }
-  }
 
-  // Second pass: check by name for products without IDs or duplicates
-  const deduplicatedById = Array.from(uniqueById.values());
-  
-  for (const product of deduplicatedById) {
-    const normalizedName = product.name.trim().toLowerCase();
-    const existing = uniqueByName.get(normalizedName);
-    
-    if (!existing) {
-      uniqueByName.set(normalizedName, product);
-    } else {
-      // Keep the one with more tiers or longer description
-      const currentTierCount = product.tiers?.length || 0;
-      const existingTierCount = existing.tiers?.length || 0;
-      const currentDescLength = product.desc?.length || 0;
-      const existingDescLength = existing.desc?.length || 0;
+    // Find the lowest price among variants for the base price
+    const lowestPrice = Math.min(...variants.map(v => v.price));
 
-      if (currentTierCount > existingTierCount || 
-          (currentTierCount === existingTierCount && currentDescLength > existingDescLength)) {
-        uniqueByName.set(normalizedName, product);
-      }
-    }
-  }
+    // Find a variant with tiers to use as base tiers (prefer the first one with tiers)
+    const baseTiers = variants.find(v => v.tiers && v.tiers.length > 0)?.tiers || [];
 
-  return Array.from(uniqueByName.values());
-}
+    // Parse variants
+    const parsedVariants: ParsedVariant[] = variants.map(variant => {
+      const variantType = detectVariantType(variant.name, parent);
+      const priceModifier = variant.price - lowestPrice;
 
-/**
- * Main parser function - converts raw API products to parsed format
- */
-export function parseProducts(rawProducts: RawProduct[]): ParsedProduct[] {
-  // Step 1: Deduplicate
-  const uniqueProducts = deduplicateProducts(rawProducts);
+      return {
+        variantName: variant.name,
+        variantType,
+        stockQuantity: variant.qty || 0,
+        priceModifier,
+        isAvailable: true,
+        sourceId: variant.id.toString(),
+        tiers: parsePricingTiers(variant.tiers)
+      };
+    });
 
-  // Step 2: Parse each product
-  const parsedProducts = uniqueProducts.map(product => {
-    const category = assignCategory(product);
-    const pricingTiers = parsePricingTiers(product);
-    const volume = extractVolume(product);
+    // Extract volume from parent name/description
+    const volume = extractVolume(`${parent.name} ${parent.desc || ''}`);
 
-    // Use first image as primary, rest as additional
-    const images = product.images || [];
-    const imageUrl = images.length > 0 ? images[0] : null;
-
-    return {
-      sourceId: product.id.toString(),
-      name: product.name.trim(),
-      description: product.desc?.trim() || null,
-      price: product.price,
-      imageUrl,
-      images,
+    // Create the product
+    parsedProducts.push({
+      sourceId: `parent_${parent.name.replace(/\s+/g, '_')}`,
+      name: parent.name,
+      description: parent.desc || null,
+      price: lowestPrice,
+      imageUrl: parentImages[0] || null,
+      images: parentImages,
       mainCategory: category.main,
       subCategory: category.sub,
-      brand: product.brand?.trim() || null,
+      brand: parent.brand || null,
       volume,
-      stockQuantity: 0, // Set by availability logic
-      pricingTiers
-    };
-  });
+      stockQuantity: variants.reduce((sum, v) => sum + (v.qty || 0), 0),
+      pricingTiers: parsePricingTiers(baseTiers),
+      variants: parsedVariants
+    });
+  }
 
-  // Step 3: Sort alphabetically by name within categories
-  parsedProducts.sort((a, b) => {
-    if (a.mainCategory !== b.mainCategory) {
-      return a.mainCategory.localeCompare(b.mainCategory);
-    }
-    return a.name.localeCompare(b.name);
-  });
+  // Sort alphabetically by name
+  parsedProducts.sort((a, b) => a.name.localeCompare(b.name));
 
   return parsedProducts;
 }
@@ -354,11 +392,16 @@ export function detectProductChanges(
     changedFields.push('imageUrl');
   }
 
-  // Check tier changes
   const existingTierString = JSON.stringify(existing.pricingTiers);
   const incomingTierString = JSON.stringify(incoming.pricingTiers);
   if (existingTierString !== incomingTierString) {
     changedFields.push('pricingTiers');
+  }
+
+  const existingVariantString = JSON.stringify(existing.variants);
+  const incomingVariantString = JSON.stringify(incoming.variants);
+  if (existingVariantString !== incomingVariantString) {
+    changedFields.push('variants');
   }
 
   return {
