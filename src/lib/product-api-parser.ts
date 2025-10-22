@@ -133,8 +133,8 @@ export function assignCategory(
     return { main: 'Accessories', sub: null };
   }
 
-  // LAST RESORT: Miscellaneous (should rarely happen now)
-  return { main: 'Miscellaneous', sub: null };
+  // FINAL FALLBACK: Default to Accessories to avoid non-existent "Miscellaneous"
+  return { main: 'Accessories', sub: null };
 }
 
 /**
@@ -170,6 +170,26 @@ function detectVariantType(variantName: string, parentName: string): string {
 }
 
 /**
+ * Normalize image filenames using API prefix and preferred size
+ */
+function normalizeImageFilename(filename: string, prefix?: string, sizes?: number[]): string {
+  if (!filename) return filename;
+  const preferred = sizes && sizes.length ? (sizes.includes(450) ? 450 : Math.max(...sizes)) : 450;
+
+  let normalized = filename;
+  if (filename.startsWith('x_imgvariantsize-')) {
+    normalized = filename.replace('x_imgvariantsize-', `x${preferred}-`);
+  }
+  // Already sized like x250-... keep as is
+
+  if (prefix) {
+    // Ensure there is exactly one slash between prefix and filename
+    return `${prefix.replace(/\/$/, '')}/${normalized.replace(/^\//, '')}`;
+  }
+  return normalized;
+}
+
+/**
  * Extract products from your API format
  */
 export function extractProductsFromAPI(apiResponse: RawAPIResponse | RawProduct[]): Array<{
@@ -180,6 +200,8 @@ export function extractProductsFromAPI(apiResponse: RawAPIResponse | RawProduct[
     tags?: string[];
     imgs?: Record<string, string>;
     cat?: string | null;
+    imagePathPrefix?: string;
+    imageSizeVariants?: number[];
   };
   variants: RawProduct[];
 }> {
@@ -196,7 +218,9 @@ export function extractProductsFromAPI(apiResponse: RawAPIResponse | RawProduct[
             brand: dataItem.brand,
             tags: dataItem.tags || [],
             imgs: dataItem.imgs || {},
-            cat: dataItem.cat // IMPORTANT: Preserve the category from API
+            cat: dataItem.cat, // IMPORTANT: Preserve the category from API
+            imagePathPrefix: apiResponse.imagePathPrefix,
+            imageSizeVariants: apiResponse.imageSizeVariants,
           },
           variants: dataItem.products
         });
@@ -290,22 +314,28 @@ export function parseProducts(rawData: Array<{ parent: any; variants: RawProduct
       parent.cat // Pass the API's category
     );
 
-    // Skip if still miscategorized (safety check)
-    if (category.main === 'Miscellaneous') {
-      console.warn(`⚠️ Product "${parent.name}" defaulted to Miscellaneous - check categorization rules`);
-    }
-
-    // Get images
+    // Get images (normalize with prefix and preferred size)
     const images: string[] = [];
     if (parent.imgs) {
-      images.push(...Object.values(parent.imgs));
+      images.push(
+        ...Object.values(parent.imgs).map((img: string) =>
+          normalizeImageFilename(img, parent.imagePathPrefix, parent.imageSizeVariants)
+        )
+      );
     }
     // Add variant images
     for (const variant of variants) {
       if (variant.images) {
-        images.push(...variant.images);
+        images.push(
+          ...variant.images.map((img: string) =>
+            normalizeImageFilename(img, parent.imagePathPrefix, parent.imageSizeVariants)
+          )
+        );
       }
     }
+
+    // Dedupe and limit images
+    const uniqueImages = Array.from(new Set(images)).slice(0, 5);
 
     // Find base price (lowest among variants)
     const basePrice = Math.min(...variants.map(v => v.price));
@@ -344,8 +374,8 @@ export function parseProducts(rawData: Array<{ parent: any; variants: RawProduct
       name: parent.name,
       description: parent.desc || null,
       price: basePrice,
-      imageUrl: images[0] || null,
-      images: images.slice(0, 5), // Limit to 5 images
+      imageUrl: uniqueImages[0] || null,
+      images: uniqueImages,
       mainCategory: category.main,
       subCategory: category.sub,
       brand: parent.brand || null,

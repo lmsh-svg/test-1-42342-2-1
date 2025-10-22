@@ -82,15 +82,26 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
         requestBody.apiConfigId = apiConfigId;
       }
 
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+
       const response = await fetch('/api/admin/api-configs/sync-from-json', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(requestBody),
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get('Content-Type') || '';
+      let data: any;
+
+      if (contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(text || 'Sync failed (non-JSON response)');
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'Sync failed');

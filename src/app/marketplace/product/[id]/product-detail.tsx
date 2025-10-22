@@ -577,112 +577,95 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
             </div>
           </div>
 
-          {/* PRICING SECTION - SIMPLIFIED */}
+          {/* PRICING SECTION - CLEAN TIER DROPDOWN */}
           <div className="border-b pb-6">
-            {/* Markup Notification - Compact */}
-            {markupCalculation && markupCalculation.appliedMarkups.length > 0 && (
-              <div className="mb-4 p-2 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-                <div className="flex items-center gap-2 text-xs">
-                  <Percent className="h-3 w-3 text-purple-600 flex-shrink-0" />
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-foreground">Store Markup:</span>
-                    <span className="text-muted-foreground">
-                      ${product.price.toFixed(2)} → ${markupCalculation.finalPrice.toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* MAIN PRICING DISPLAY WITH TIERS */}
             {pricingTiers.length > 1 ? (
               <div className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                    <TrendingDown className="h-4 w-4 text-green-600" />
-                    Volume Pricing - Buy More, Save More
-                  </h3>
-                  
-                  {/* Pricing Tiers Table */}
-                  <div className="border-2 border-border rounded-lg overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted">
-                        <tr>
-                          <th className="text-left p-3 font-semibold">Quantity</th>
-                          <th className="text-right p-3 font-semibold">Price per Unit</th>
-                          <th className="text-right p-3 font-semibold">You Save</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pricingTiers.map((tier, index) => (
-                          <tr 
-                            key={tier.minQuantity}
-                            className={`border-t transition-colors ${
-                              tier.minQuantity === selectedTierQuantity 
-                                ? 'bg-primary/10 border-primary/50' 
-                                : 'hover:bg-muted/30'
-                            }`}
-                          >
-                            <td className="p-3">
-                              <span className={`font-semibold ${
-                                tier.minQuantity === selectedTierQuantity ? 'text-primary' : ''
-                              }`}>
-                                {tier.quantity}
-                              </span>
-                            </td>
-                            <td className="text-right p-3">
-                              <span className={`text-lg font-bold ${
-                                tier.minQuantity === selectedTierQuantity ? 'text-primary' : 'text-foreground'
-                              }`}>
-                                ${tier.pricePerUnit.toFixed(2)}
-                              </span>
-                            </td>
-                            <td className="text-right p-3">
-                              {tier.savings > 0 ? (
-                                <span className="text-green-600 font-semibold">
-                                  ${tier.savings.toFixed(2)}
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                {/* Simple Price Display with Tier Dropdown */}
+                <div className="space-y-3">
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-sm text-muted-foreground">Starts at</span>
+                    <span className="text-4xl font-bold text-primary">
+                      ${pricingTiers[0].pricePerUnit.toFixed(2)}
+                    </span>
+                    <span className="text-sm text-muted-foreground">per unit</span>
                   </div>
 
-                  {/* Selected Tier Summary */}
-                  <div className="mt-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Currently viewing:</span>
-                      <span className="text-sm font-semibold text-primary">
-                        {selectedTierQuantity}+ Units @ ${
-                          pricingTiers.find(t => t.minQuantity === selectedTierQuantity)?.pricePerUnit.toFixed(2)
-                        } each
+                  {/* Tier Selection Dropdown */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Select Pricing Tier:</label>
+                    <Select 
+                      value={selectedTierQuantity.toString()} 
+                      onValueChange={handleTierChange}
+                    >
+                      <SelectTrigger className="h-14 border-2">
+                        <SelectValue>
+                          <div className="flex items-center justify-between w-full pr-4">
+                            <span className="font-semibold text-lg">{selectedTierQuantity}+ Units</span>
+                            <div className="text-right">
+                              <div className="font-bold text-primary text-lg">
+                                ${pricingTiers.find(t => t.minQuantity === selectedTierQuantity)?.pricePerUnit.toFixed(2)}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                per unit
+                              </div>
+                            </div>
+                          </div>
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {pricingTiers.map((tier) => (
+                          <SelectItem 
+                            key={tier.minQuantity} 
+                            value={tier.minQuantity.toString()}
+                            className="py-3"
+                          >
+                            <div className="flex items-center justify-between w-full gap-6">
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-base">{tier.quantity}</span>
+                                {tier.savings > 0 && (
+                                  <span className="text-xs text-green-600 font-medium">
+                                    Save ${tier.savings.toFixed(2)} per order
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <div className="font-bold text-primary text-base">
+                                  ${tier.pricePerUnit.toFixed(2)}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  per unit
+                                </div>
+                              </div>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Savings Badge */}
+                  {pricingTiers.find(t => t.minQuantity === selectedTierQuantity)?.savings! > 0 && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <TrendingDown className="h-4 w-4 text-green-600" />
+                      <span className="text-green-600 font-semibold">
+                        You save ${pricingTiers.find(t => t.minQuantity === selectedTierQuantity)?.savings.toFixed(2)} when buying {selectedTierQuantity}+
                       </span>
                     </div>
-                  </div>
-                </div>
-
-                {/* Current Price Display */}
-                <div className="flex items-baseline gap-3 pt-2">
-                  <span className="text-4xl font-bold text-primary">
-                    ${getFinalPrice().toFixed(2)}
-                  </span>
-                  <span className="text-sm text-muted-foreground">per unit</span>
+                  )}
                 </div>
               </div>
             ) : (
               /* Single Price - No Tiers */
               <div className="flex items-baseline gap-3">
-                <span className="text-5xl font-bold text-foreground">
+                <span className="text-4xl font-bold text-primary">
                   ${getCurrentPrice().toFixed(2)}
                 </span>
+                <span className="text-sm text-muted-foreground">per unit</span>
               </div>
             )}
 
-            {/* Variant Price Breakdown */}
+            {/* Variant Price Modifiers */}
             {hasVariants && Object.values(selectedVariants).some(v => v.priceModifier !== 0) && (
               <div className="mt-3 space-y-1 text-sm">
                 {Object.entries(selectedVariants).map(([type, variant]) => 
@@ -797,63 +780,14 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
 
           {/* Quantity & Add to Cart */}
           <div className="space-y-4">
-            {pricingTiers.length > 1 && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Select Quantity Tier:</label>
-                <Select 
-                  value={selectedTierQuantity.toString()} 
-                  onValueChange={handleTierChange}
-                >
-                  <SelectTrigger className="h-12 border-2">
-                    <SelectValue>
-                      <div className="flex items-center justify-between w-full">
-                        <span className="font-medium">{selectedTierQuantity}+ Units</span>
-                        <span className="text-primary font-bold">
-                          ${pricingTiers.find(t => t.minQuantity === selectedTierQuantity)?.pricePerUnit.toFixed(2)}/unit
-                        </span>
-                      </div>
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {pricingTiers.map((tier) => (
-                      <SelectItem 
-                        key={tier.minQuantity} 
-                        value={tier.minQuantity.toString()}
-                        className="py-3"
-                      >
-                        <div className="flex items-center justify-between w-full gap-4">
-                          <div className="flex flex-col">
-                            <span className="font-semibold">{tier.quantity}</span>
-                            {tier.savings > 0 && (
-                              <span className="text-xs text-green-600">
-                                Save ${tier.savings.toFixed(2)}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <div className="font-bold text-primary">
-                              ${tier.pricePerUnit.toFixed(2)}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              per unit
-                            </div>
-                          </div>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
             <div className="flex items-center gap-4">
               <label className="text-sm font-medium">Quantity:</label>
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  disabled={quantity <= 1 || isAddingToCart}
+                  onClick={() => setQuantity(Math.max(selectedTierQuantity, quantity - 1))}
+                  disabled={quantity <= selectedTierQuantity || isAddingToCart}
                 >
                   <Minus className="h-4 w-4" />
                 </Button>
