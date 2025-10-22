@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { parseProducts, extractProductsFromAPI, type ParsedProduct } from '@/lib/product-api-parser';
 
 interface ProductJSONSyncProps {
-  apiConfigId: number;
+  apiConfigId?: number;
   onSyncComplete?: () => void;
 }
 
@@ -36,24 +36,28 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
     try {
       const parsed = JSON.parse(jsonInput);
       
-      // Extract products with parent/variant structure
+      // Extract products from your API structure
       const extractedData = extractProductsFromAPI(parsed);
 
       if (extractedData.length === 0) {
-        throw new Error('No products found in JSON. Make sure your JSON contains either a "data" array with nested "products" arrays, or a flat "products" array.');
+        throw new Error('No products found. Make sure your JSON has a "data" array with nested "products" arrays.');
       }
 
-      // Parse products with variant support
+      // Parse products with proper categorization and variant grouping
       const parsedProducts = parseProducts(extractedData);
+      
+      if (parsedProducts.length === 0) {
+        throw new Error('Parsing failed - no valid products extracted.');
+      }
       
       setParseResults(parsedProducts);
       
       const totalVariants = parsedProducts.reduce((sum, p) => sum + p.variants.length, 0);
       toast.success(
-        `Successfully parsed ${parsedProducts.length} products with ${totalVariants} total variants from ${extractedData.length} raw entries`
+        `✅ Parsed ${parsedProducts.length} products with ${totalVariants} variants!`
       );
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to parse JSON';
+      const errorMessage = err instanceof Error ? err.message : 'Invalid JSON format';
       setError(errorMessage);
       toast.error(errorMessage);
     }
@@ -69,30 +73,36 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
     setError(null);
 
     try {
+      const requestBody: any = {
+        products: parseResults,
+      };
+
+      // apiConfigId is optional - if not provided, products are marked as manual
+      if (apiConfigId) {
+        requestBody.apiConfigId = apiConfigId;
+      }
+
       const response = await fetch('/api/admin/api-configs/sync-from-json', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          apiConfigId,
-          products: parseResults,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to sync products');
+        throw new Error(data.error || 'Sync failed');
       }
 
       setSyncResults(data);
       toast.success(
-        `Successfully synced ${data.productsCreated + data.productsUpdated} products! ` +
-        `(${data.productsCreated} created, ${data.productsUpdated} updated, ` +
-        `${data.variantsCreated || 0} variants, ${data.tiersCreated} tiers, ${data.imagesCreated} images)`
+        `🎉 Success! ${data.productsCreated + data.productsUpdated} products synced ` +
+        `(${data.variantsCreated || 0} variants, ${data.tiersCreated} tiers)`
       );
 
+      // Clear form
       setJsonInput('');
       setParseResults(null);
       
@@ -100,7 +110,7 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
         onSyncComplete();
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to sync products';
+      const errorMessage = err instanceof Error ? err.message : 'Sync failed';
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -125,22 +135,37 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Sync Products from JSON</CardTitle>
+          <CardTitle>Product Import from JSON</CardTitle>
           <CardDescription>
-            Paste your Product API JSON below. The system will automatically:
-            <ul className="list-disc list-inside mt-2 space-y-1">
-              <li><strong>Parse parent products with variants</strong> (colors, flavors, strains)</li>
-              <li>Assign categories based on tags, description, and brand</li>
-              <li>Parse pricing tiers (1+, 3+, 5+, etc.)</li>
-              <li>Extract product images</li>
-              <li>Store variants in productVariants table</li>
-              <li>Sort products alphabetically</li>
-            </ul>
+            Paste your complete Product API JSON below. The system will automatically:
           </CardDescription>
+          <ul className="list-disc list-inside mt-2 space-y-1 text-sm text-muted-foreground">
+            <li><strong>Group variants by parent product</strong> (colors, flavors, strains)</li>
+            <li><strong>Use API categories when provided</strong> (respects "cat" field)</li>
+            <li><strong>Extract all pricing tiers</strong> (1+, 5+, 10+, etc.)</li>
+            <li><strong>Works standalone</strong> (no API configuration needed)</li>
+          </ul>
         </CardHeader>
         <CardContent className="space-y-4">
           <Textarea
-            placeholder='Paste your Product API JSON here (full API response with data[], lastUpdated, etc.)...'
+            placeholder='Paste your full Product API JSON here...
+
+Your API format is supported:
+{
+  "lastUpdated": 1760931539308,
+  "data": [
+    {
+      "name": "4th Gen 510 Thread Battery",
+      "brand": "Dime",
+      "cat": "Accessories",
+      "products": [
+        { "name": "Black", "id": 3025, "price": 16.99, "tiers": [...] },
+        { "name": "Red", "id": 3024, "price": 16.99 },
+        { "name": "White", "id": 3026, "price": 14.99 }
+      ]
+    }
+  ]
+}'
             value={jsonInput}
             onChange={(e) => setJsonInput(e.target.value)}
             className="font-mono text-xs min-h-[300px]"
@@ -187,13 +212,16 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
             <Alert>
               <CheckCircle2 className="h-4 w-4" />
               <AlertDescription>
-                <div className="font-semibold mb-2">Sync Complete!</div>
+                <div className="font-semibold mb-2">✅ Sync Complete!</div>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
                   <div>Created: <strong>{syncResults.productsCreated}</strong></div>
                   <div>Updated: <strong>{syncResults.productsUpdated}</strong></div>
                   <div>Variants: <strong>{syncResults.variantsCreated || 0}</strong></div>
                   <div>Tiers: <strong>{syncResults.tiersCreated}</strong></div>
                   <div>Images: <strong>{syncResults.imagesCreated}</strong></div>
+                </div>
+                <div className="mt-2 text-xs text-green-600 dark:text-green-400 font-medium">
+                  ✅ Products are now live in the marketplace!
                 </div>
               </AlertDescription>
             </Alert>
@@ -204,15 +232,15 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
       {parseResults && (
         <Card>
           <CardHeader>
-            <CardTitle>Parse Preview</CardTitle>
+            <CardTitle>Parse Preview ({parseResults.length} products)</CardTitle>
             <CardDescription>
-              {parseResults.length} products ready to sync
+              {parseResults.reduce((sum, p) => sum + p.variants.length, 0)} total variants across all products
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Category Statistics */}
             <div>
-              <h3 className="font-semibold mb-2">Categories:</h3>
+              <h3 className="font-semibold mb-2">Category Breakdown:</h3>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(categoryStats).map(([category, count]) => (
                   <Badge key={category} variant="secondary">
@@ -224,7 +252,7 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
 
             {/* Product List */}
             <div className="space-y-2">
-              <h3 className="font-semibold">Products:</h3>
+              <h3 className="font-semibold">Products Preview:</h3>
               <div className="max-h-[400px] overflow-y-auto space-y-2 pr-2">
                 {parseResults.map((product, index) => (
                   <div
@@ -243,9 +271,6 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
                           </Badge>
                           {product.brand && (
                             <span className="text-xs">Brand: {product.brand}</span>
-                          )}
-                          {product.volume && (
-                            <span className="text-xs">Volume: {product.volume}</span>
                           )}
                         </div>
                       </div>
@@ -271,7 +296,7 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
                           {product.variants.map((variant, vIndex) => (
                             <Badge key={vIndex} variant="outline" className="text-xs">
                               {variant.variantName}
-                              {variant.priceModifier !== 0 && ` (+$${variant.priceModifier.toFixed(2)})`}
+                              {variant.priceModifier > 0 && ` (+$${variant.priceModifier.toFixed(2)})`}
                             </Badge>
                           ))}
                         </div>
@@ -289,15 +314,6 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
                             </Badge>
                           ))}
                         </div>
-                      </div>
-                    )}
-
-                    {/* Images */}
-                    {product.images.length > 0 && (
-                      <div className="pl-6 text-xs">
-                        <p className="text-muted-foreground">
-                          {product.images.length} image{product.images.length > 1 ? 's' : ''}
-                        </p>
                       </div>
                     )}
                   </div>
