@@ -12,9 +12,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { ArrowLeft, Plus, Upload, Link as LinkIcon, Eye, RefreshCw, Trash2, Settings, FileJson, FileCode, Package, ImageOff, Combine } from 'lucide-react';
+import { ArrowLeft, Plus, Upload, Link as LinkIcon, Eye, RefreshCw, Trash2, Settings, FileJson, FileCode, Package, ImageOff, Combine, Code2 } from 'lucide-react';
 import { SyncProgressDialog } from '@/components/admin/sync-progress-dialog';
+import { ProductJSONSync } from './product-json-sync';
 import { useInactivityLogout } from '@/hooks/use-inactivity-logout';
 import { InactivityWarning } from '@/components/auth/inactivity-warning';
 
@@ -343,344 +345,370 @@ export default function AdminApiManagementPage() {
           </div>
         </div>
 
-        {/* Add Configuration Form */}
-        {showAddForm && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>New API Configuration</CardTitle>
-              <CardDescription>Add a new data source for product imports</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleCreateConfig} className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Configuration Name *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g., Main Product Feed"
-                    required
-                  />
-                </div>
+        {/* NEW: Tabbed Interface */}
+        <Tabs defaultValue="configs" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="configs">Configurations</TabsTrigger>
+            <TabsTrigger value="json-sync" className="flex items-center gap-2">
+              <Code2 className="h-4 w-4" />
+              JSON Sync
+            </TabsTrigger>
+            <TabsTrigger value="logs">Logs</TabsTrigger>
+          </TabsList>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="type">Data Format *</Label>
-                    <Select value={formData.type} onValueChange={(v: 'json' | 'html') => setFormData({ ...formData, type: v })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="json">JSON</SelectItem>
-                        <SelectItem value="html">HTML</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="sourceType">Source Type *</Label>
-                    <Select value={formData.sourceType} onValueChange={(v: 'url' | 'file') => setFormData({ ...formData, sourceType: v })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="url">URL</SelectItem>
-                        <SelectItem value="file">File Upload</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {formData.sourceType === 'url' ? (
-                  <div>
-                    <Label htmlFor="sourceUrl">Source URL *</Label>
-                    <Input
-                      id="sourceUrl"
-                      type="url"
-                      value={formData.sourceUrl}
-                      onChange={(e) => setFormData({ ...formData, sourceUrl: e.target.value })}
-                      placeholder="https://example.com/products.json"
-                      required
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    <Label htmlFor="file">Upload File *</Label>
-                    <Input
-                      id="file"
-                      type="file"
-                      accept={formData.type === 'json' ? '.json' : '.html,.htm'}
-                      onChange={handleFileUpload}
-                      required
-                    />
-                    {formData.sourceContent && (
-                      <p className="text-sm text-muted-foreground mt-2">
-                        File loaded ({(formData.sourceContent.length / 1024).toFixed(2)} KB)
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between py-2 border-t">
-                  <div>
-                    <Label htmlFor="isTestMode">Test Mode</Label>
-                    <p className="text-sm text-muted-foreground">Preview imports without affecting live products</p>
-                  </div>
-                  <Switch
-                    id="isTestMode"
-                    checked={formData.isTestMode}
-                    onCheckedChange={(checked) => setFormData({ ...formData, isTestMode: checked })}
-                  />
-                </div>
-
-                {/* NEW: Advanced Settings */}
-                <div className="border-t pt-4">
-                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                    <Settings className="h-4 w-4" />
-                    Advanced Settings
-                  </h3>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between py-2">
-                      <div>
-                        <Label htmlFor="loadImages" className="flex items-center gap-2">
-                          <ImageOff className="h-4 w-4" />
-                          Load Images
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          Enable image loading from this source (disable for HTML to use JSON images only)
-                        </p>
-                      </div>
-                      <Switch
-                        id="loadImages"
-                        checked={formData.loadImages}
-                        onCheckedChange={(checked) => setFormData({ ...formData, loadImages: checked })}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between py-2">
-                      <div>
-                        <Label htmlFor="enableDuplicateMerging" className="flex items-center gap-2">
-                          <Combine className="h-4 w-4" />
-                          Duplicate Merging
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          Automatically merge duplicate products across different sources
-                        </p>
-                      </div>
-                      <Switch
-                        id="enableDuplicateMerging"
-                        checked={formData.enableDuplicateMerging}
-                        onCheckedChange={(checked) => setFormData({ ...formData, enableDuplicateMerging: checked })}
-                      />
-                    </div>
-
+          {/* Configurations Tab */}
+          <TabsContent value="configs" className="space-y-6">
+            {/* Add Configuration Form */}
+            {showAddForm && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>New API Configuration</CardTitle>
+                  <CardDescription>Add a new data source for product imports</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleCreateConfig} className="space-y-4">
                     <div>
-                      <Label htmlFor="categoryMappingRules">Category Mapping Rules (JSON)</Label>
-                      <Textarea
-                        id="categoryMappingRules"
-                        value={formData.categoryMappingRules}
-                        onChange={(e) => setFormData({ ...formData, categoryMappingRules: e.target.value })}
-                        placeholder='{"Cartridges": 1, "Disposables": 2, "Flower": 3}'
-                        rows={3}
-                        className="font-mono text-sm"
+                      <Label htmlFor="name">Configuration Name *</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="e.g., Main Product Feed"
+                        required
                       />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Define custom category sorting order (optional)
-                      </p>
                     </div>
-                  </div>
-                </div>
 
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={() => setShowAddForm(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">
-                    Create Configuration
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Configurations List */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Configurations</CardTitle>
-            <CardDescription>Manage your API data sources</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {configs.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No configurations yet</p>
-            ) : (
-              <div className="space-y-4">
-                {configs.map((config) => (
-                  <div key={config.id} className="border rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-3">
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold">{config.name}</h3>
-                          {config.type === 'json' ? (
-                            <FileJson className="h-4 w-4 text-blue-500" />
-                          ) : (
-                            <FileCode className="h-4 w-4 text-orange-500" />
-                          )}
-                          {config.sourceType === 'url' ? (
-                            <LinkIcon className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <Upload className="h-4 w-4 text-muted-foreground" />
-                          )}
-                          {!config.loadImages && (
-                            <Badge variant="outline" className="text-xs">
-                              <ImageOff className="h-3 w-3 mr-1" />
-                              No Images
-                            </Badge>
-                          )}
-                          {config.enableDuplicateMerging && (
-                            <Badge variant="outline" className="text-xs">
-                              <Combine className="h-3 w-3 mr-1" />
-                              Merge
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {config.sourceType === 'url' ? config.sourceUrl : 'File upload'}
-                        </p>
+                        <Label htmlFor="type">Data Format *</Label>
+                        <Select value={formData.type} onValueChange={(v: 'json' | 'html') => setFormData({ ...formData, type: v })}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="json">JSON</SelectItem>
+                            <SelectItem value="html">HTML</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                      <div className="flex gap-2">
-                        {config.isTestMode && <Badge variant="outline">Test Mode</Badge>}
-                        {config.isActive && <Badge variant="default">Active</Badge>}
+
+                      <div>
+                        <Label htmlFor="sourceType">Source Type *</Label>
+                        <Select value={formData.sourceType} onValueChange={(v: 'url' | 'file') => setFormData({ ...formData, sourceType: v })}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="url">URL</SelectItem>
+                            <SelectItem value="file">File Upload</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
 
-                    {config.lastSyncedAt && (
-                      <p className="text-xs text-muted-foreground mb-3">
-                        Last synced: {new Date(config.lastSyncedAt).toLocaleString()}
-                      </p>
-                    )}
-
-                    {/* Advanced Settings Panel */}
-                    {showAdvancedSettings === config.id && (
-                      <div className="mb-3 p-3 bg-muted rounded-lg space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label>Load Images</Label>
-                          <Switch
-                            checked={config.loadImages}
-                            onCheckedChange={(checked) => 
-                              handleUpdateAdvancedSettings(config.id, { loadImages: checked })
-                            }
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <Label>Enable Duplicate Merging</Label>
-                          <Switch
-                            checked={config.enableDuplicateMerging}
-                            onCheckedChange={(checked) => 
-                              handleUpdateAdvancedSettings(config.id, { enableDuplicateMerging: checked })
-                            }
-                          />
-                        </div>
-                        {config.categoryMappingRules && (
-                          <div>
-                            <Label className="text-xs">Category Mapping Rules</Label>
-                            <pre className="text-xs bg-background p-2 rounded mt-1 overflow-x-auto">
-                              {JSON.stringify(JSON.parse(config.categoryMappingRules), null, 2)}
-                            </pre>
-                          </div>
+                    {formData.sourceType === 'url' ? (
+                      <div>
+                        <Label htmlFor="sourceUrl">Source URL *</Label>
+                        <Input
+                          id="sourceUrl"
+                          type="url"
+                          value={formData.sourceUrl}
+                          onChange={(e) => setFormData({ ...formData, sourceUrl: e.target.value })}
+                          placeholder="https://example.com/products.json"
+                          required
+                        />
+                      </div>
+                    ) : (
+                      <div>
+                        <Label htmlFor="file">Upload File *</Label>
+                        <Input
+                          id="file"
+                          type="file"
+                          accept={formData.type === 'json' ? '.json' : '.html,.htm'}
+                          onChange={handleFileUpload}
+                          required
+                        />
+                        {formData.sourceContent && (
+                          <p className="text-sm text-muted-foreground mt-2">
+                            File loaded ({(formData.sourceContent.length / 1024).toFixed(2)} KB)
+                          </p>
                         )}
                       </div>
                     )}
+
+                    <div className="flex items-center justify-between py-2 border-t">
+                      <div>
+                        <Label htmlFor="isTestMode">Test Mode</Label>
+                        <p className="text-sm text-muted-foreground">Preview imports without affecting live products</p>
+                      </div>
+                      <Switch
+                        id="isTestMode"
+                        checked={formData.isTestMode}
+                        onCheckedChange={(checked) => setFormData({ ...formData, isTestMode: checked })}
+                      />
+                    </div>
+
+                    <div className="border-t pt-4">
+                      <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <Settings className="h-4 w-4" />
+                        Advanced Settings
+                      </h3>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between py-2">
+                          <div>
+                            <Label htmlFor="loadImages" className="flex items-center gap-2">
+                              <ImageOff className="h-4 w-4" />
+                              Load Images
+                            </Label>
+                            <p className="text-sm text-muted-foreground">
+                              Enable image loading from this source (disable for HTML to use JSON images only)
+                            </p>
+                          </div>
+                          <Switch
+                            id="loadImages"
+                            checked={formData.loadImages}
+                            onCheckedChange={(checked) => setFormData({ ...formData, loadImages: checked })}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between py-2">
+                          <div>
+                            <Label htmlFor="enableDuplicateMerging" className="flex items-center gap-2">
+                              <Combine className="h-4 w-4" />
+                              Duplicate Merging
+                            </Label>
+                            <p className="text-sm text-muted-foreground">
+                              Automatically merge duplicate products across different sources
+                            </p>
+                          </div>
+                          <Switch
+                            id="enableDuplicateMerging"
+                            checked={formData.enableDuplicateMerging}
+                            onCheckedChange={(checked) => setFormData({ ...formData, enableDuplicateMerging: checked })}
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor="categoryMappingRules">Category Mapping Rules (JSON)</Label>
+                          <Textarea
+                            id="categoryMappingRules"
+                            value={formData.categoryMappingRules}
+                            onChange={(e) => setFormData({ ...formData, categoryMappingRules: e.target.value })}
+                            placeholder='{"Cartridges": 1, "Disposables": 2, "Flower": 3}'
+                            rows={3}
+                            className="font-mono text-sm"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Define custom category sorting order (optional)
+                          </p>
+                        </div>
+                      </div>
+                    </div>
 
                     <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        onClick={() => setShowAdvancedSettings(
-                          showAdvancedSettings === config.id ? null : config.id
-                        )}
-                      >
-                        <Settings className="h-4 w-4 mr-1" />
-                        {showAdvancedSettings === config.id ? 'Hide' : 'Settings'}
+                      <Button type="button" variant="outline" onClick={() => setShowAddForm(false)}>
+                        Cancel
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => handlePreview(config.id)}>
-                        <Eye className="h-4 w-4 mr-1" />
-                        Preview
-                      </Button>
-                      <Button size="sm" onClick={() => handleSync(config.id, config.isTestMode, config.name)}>
-                        <RefreshCw className="h-4 w-4 mr-1" />
-                        {config.isTestMode ? 'Test Sync' : 'Sync Now'}
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={async () => {
-                          const token = localStorage.getItem('auth_token');
-                          const res = await fetch(`/api/admin/api-configs/${config.id}/activate`, {
-                            method: 'POST',
-                            headers: { 'Authorization': `Bearer ${token}` }
-                          });
-                          if (res.ok) {
-                            toast.success(config.isActive ? 'Config deactivated' : 'Config activated');
-                            fetchConfigs();
-                          }
-                        }}
-                      >
-                        {config.isActive ? 'Deactivate' : 'Activate'}
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => handleDeleteConfig(config.id)}>
-                        <Trash2 className="h-4 w-4" />
+                      <Button type="submit">
+                        Create Configuration
                       </Button>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  </form>
+                </CardContent>
+              </Card>
             )}
-          </CardContent>
-        </Card>
 
-        {/* Logs */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Recent Logs</CardTitle>
-                <CardDescription>Sync history and status</CardDescription>
-              </div>
-              <Button size="sm" variant="outline" onClick={fetchLogs}>
-                <RefreshCw className="h-4 w-4 mr-1" />
-                Refresh
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {logs.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No logs yet</p>
-            ) : (
-              <div className="space-y-3">
-                {logs.map((log) => (
-                  <div key={log.id} className="border-l-4 pl-4 py-2" style={{
-                    borderColor: log.status === 'success' ? 'green' : log.status === 'error' ? 'red' : 'orange'
-                  }}>
-                    <div className="flex items-start justify-between mb-1">
-                      <p className="font-medium text-sm">{log.message}</p>
-                      <Badge variant={log.status === 'success' ? 'default' : log.status === 'error' ? 'destructive' : 'outline'}>
-                        {log.status}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(log.createdAt).toLocaleString()} • {log.action}
-                      {log.productsProcessed !== null && ` • ${log.productsProcessed} processed`}
-                      {log.productsCreated !== null && ` • ${log.productsCreated} created`}
-                      {log.productsUpdated !== null && ` • ${log.productsUpdated} updated`}
-                    </p>
+            {/* Configurations List */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Configurations</CardTitle>
+                <CardDescription>Manage your API data sources</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {configs.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No configurations yet</p>
+                ) : (
+                  <div className="space-y-4">
+                    {configs.map((config) => (
+                      <div key={config.id} className="border rounded-lg p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-semibold">{config.name}</h3>
+                              {config.type === 'json' ? (
+                                <FileJson className="h-4 w-4 text-blue-500" />
+                              ) : (
+                                <FileCode className="h-4 w-4 text-orange-500" />
+                              )}
+                              {config.sourceType === 'url' ? (
+                                <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <Upload className="h-4 w-4 text-muted-foreground" />
+                              )}
+                              {!config.loadImages && (
+                                <Badge variant="outline" className="text-xs">
+                                  <ImageOff className="h-3 w-3 mr-1" />
+                                  No Images
+                                </Badge>
+                              )}
+                              {config.enableDuplicateMerging && (
+                                <Badge variant="outline" className="text-xs">
+                                  <Combine className="h-3 w-3 mr-1" />
+                                  Merge
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {config.sourceType === 'url' ? config.sourceUrl : 'File upload'}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            {config.isTestMode && <Badge variant="outline">Test Mode</Badge>}
+                            {config.isActive && <Badge variant="default">Active</Badge>}
+                          </div>
+                        </div>
+
+                        {config.lastSyncedAt && (
+                          <p className="text-xs text-muted-foreground mb-3">
+                            Last synced: {new Date(config.lastSyncedAt).toLocaleString()}
+                          </p>
+                        )}
+
+                        {showAdvancedSettings === config.id && (
+                          <div className="mb-3 p-3 bg-muted rounded-lg space-y-3">
+                            <div className="flex items-center justify-between">
+                              <Label>Load Images</Label>
+                              <Switch
+                                checked={config.loadImages}
+                                onCheckedChange={(checked) => 
+                                  handleUpdateAdvancedSettings(config.id, { loadImages: checked })
+                                }
+                              />
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <Label>Enable Duplicate Merging</Label>
+                              <Switch
+                                checked={config.enableDuplicateMerging}
+                                onCheckedChange={(checked) => 
+                                  handleUpdateAdvancedSettings(config.id, { enableDuplicateMerging: checked })
+                                }
+                              />
+                            </div>
+                            {config.categoryMappingRules && (
+                              <div>
+                                <Label className="text-xs">Category Mapping Rules</Label>
+                                <pre className="text-xs bg-background p-2 rounded mt-1 overflow-x-auto">
+                                  {JSON.stringify(JSON.parse(config.categoryMappingRules), null, 2)}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => setShowAdvancedSettings(
+                              showAdvancedSettings === config.id ? null : config.id
+                            )}
+                          >
+                            <Settings className="h-4 w-4 mr-1" />
+                            {showAdvancedSettings === config.id ? 'Hide' : 'Settings'}
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => handlePreview(config.id)}>
+                            <Eye className="h-4 w-4 mr-1" />
+                            Preview
+                          </Button>
+                          <Button size="sm" onClick={() => handleSync(config.id, config.isTestMode, config.name)}>
+                            <RefreshCw className="h-4 w-4 mr-1" />
+                            {config.isTestMode ? 'Test Sync' : 'Sync Now'}
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={async () => {
+                              const token = localStorage.getItem('auth_token');
+                              const res = await fetch(`/api/admin/api-configs/${config.id}/activate`, {
+                                method: 'POST',
+                                headers: { 'Authorization': `Bearer ${token}` }
+                              });
+                              if (res.ok) {
+                                toast.success(config.isActive ? 'Config deactivated' : 'Config activated');
+                                fetchConfigs();
+                              }
+                            }}
+                          >
+                            {config.isActive ? 'Deactivate' : 'Activate'}
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => handleDeleteConfig(config.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* NEW: JSON Sync Tab */}
+          <TabsContent value="json-sync">
+            <ProductJSONSync 
+              apiConfigId={configs.find(c => c.isActive)?.id || configs[0]?.id || 1}
+              onSyncComplete={() => {
+                fetchConfigs();
+                fetchLogs();
+              }}
+            />
+          </TabsContent>
+
+          {/* Logs Tab */}
+          <TabsContent value="logs">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Recent Logs</CardTitle>
+                    <CardDescription>Sync history and status</CardDescription>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={fetchLogs}>
+                    <RefreshCw className="h-4 w-4 mr-1" />
+                    Refresh
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {logs.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No logs yet</p>
+                ) : (
+                  <div className="space-y-3">
+                    {logs.map((log) => (
+                      <div key={log.id} className="border-l-4 pl-4 py-2" style={{
+                        borderColor: log.status === 'success' ? 'green' : log.status === 'error' ? 'red' : 'orange'
+                      }}>
+                        <div className="flex items-start justify-between mb-1">
+                          <p className="font-medium text-sm">{log.message}</p>
+                          <Badge variant={log.status === 'success' ? 'default' : log.status === 'error' ? 'destructive' : 'outline'}>
+                            {log.status}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(log.createdAt).toLocaleString()} • {log.action}
+                          {log.productsProcessed !== null && ` • ${log.productsProcessed} processed`}
+                          {log.productsCreated !== null && ` • ${log.productsCreated} created`}
+                          {log.productsUpdated !== null && ` • ${log.productsUpdated} updated`}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* Preview Modal */}
         {showPreview && previewData && (
@@ -732,7 +760,6 @@ export default function AdminApiManagementPage() {
         )}
       </div>
 
-      {/* NEW: Sync Progress Dialog */}
       <SyncProgressDialog
         open={syncProgress.open}
         configId={syncProgress.configId}
@@ -744,7 +771,6 @@ export default function AdminApiManagementPage() {
         }}
       />
 
-      {/* NEW: Inactivity Warning */}
       <InactivityWarning
         open={showWarning}
         secondsRemaining={secondsRemaining}
