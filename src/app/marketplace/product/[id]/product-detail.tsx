@@ -250,15 +250,8 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
     }
   };
 
-  const handleTierChange = (tierQty: string) => {
-    const minQty = parseInt(tierQty);
-    setSelectedTierQuantity(minQty);
-    setQuantity(minQty);
-  };
-
   const getBasePrice = () => {
     if (!product) return 0;
-    // Use markup-adjusted price as the base
     return markupCalculation?.finalPrice || product.price;
   };
 
@@ -276,7 +269,6 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
       return { price: basePrice, savings: 0, appliedRule: null };
     }
 
-    // Find the highest applicable rule (highest minQuantity that's still <= qty)
     const applicableRules = bulkPricingRules
       .filter(rule => rule.minQuantity <= qty)
       .sort((a, b) => b.minQuantity - a.minQuantity);
@@ -308,38 +300,6 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
 
   const getTotalPrice = () => {
     return getFinalPrice() * quantity;
-  };
-
-  const getSavingsInfo = () => {
-    const basePrice = getCurrentPrice();
-    const { savings, appliedRule } = calculateBulkPrice(basePrice, quantity);
-    return { savings, appliedRule };
-  };
-
-  const getNextTierInfo = () => {
-    const higherRules = bulkPricingRules
-      .filter(rule => rule.minQuantity > quantity)
-      .sort((a, b) => a.minQuantity - b.minQuantity);
-
-    if (higherRules.length === 0) return null;
-
-    const nextRule = higherRules[0];
-    const basePrice = getCurrentPrice();
-    
-    let nextTierPrice = basePrice;
-    if (nextRule.finalPrice !== null) {
-      nextTierPrice = nextRule.finalPrice;
-    } else if (nextRule.discountType === 'percentage') {
-      nextTierPrice = basePrice * (1 - nextRule.discountValue / 100);
-    } else if (nextRule.discountType === 'fixed_amount') {
-      nextTierPrice = Math.max(0, basePrice - nextRule.discountValue);
-    }
-
-    return {
-      minQuantity: nextRule.minQuantity,
-      pricePerUnit: nextTierPrice,
-      totalSavings: (basePrice - nextTierPrice) * nextRule.minQuantity,
-    };
   };
 
   const addToCart = async () => {
@@ -439,8 +399,6 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
   const currentPrice = getCurrentPrice();
   const finalPrice = getFinalPrice();
   const totalPrice = getTotalPrice();
-  const { savings, appliedRule } = getSavingsInfo();
-  const nextTierInfo = getNextTierInfo();
   const availableStock = getAvailableStock();
   const totalStock = getTotalStock();
   const hasVariants = variants.length > 0;
@@ -577,17 +535,15 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
             </div>
           </div>
 
-          {/* PRICING SECTION - EXPANDABLE LIST (NOT SELECTOR!) */}
+          {/* PRICING SECTION - FIXED */}
           <div className="border-b pb-6">
             {pricingTiers.length > 1 ? (
               <div className="space-y-4">
-                {/* Simple Price Display */}
+                {/* Simple Price Display - NO "STARTS AT" */}
                 <div className="flex items-baseline gap-3">
-                  <span className="text-sm text-muted-foreground">Starts at</span>
                   <span className="text-4xl font-bold text-primary">
                     ${pricingTiers[0].pricePerUnit.toFixed(2)}
                   </span>
-                  <span className="text-sm text-muted-foreground">per unit</span>
                 </div>
 
                 {/* EXPANDABLE TIER LIST (NOT A SELECTOR) */}
@@ -615,7 +571,7 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
                               <span className="font-semibold text-base">{tier.quantity}</span>
                               {tier.savings > 0 && (
                                 <span className="text-xs text-green-600 font-medium">
-                                  Save ${tier.savings.toFixed(2)} per order
+                                  Save ${(tier.savings / tier.minQuantity).toFixed(2)} per item
                                 </span>
                               )}
                             </div>
@@ -640,7 +596,6 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
                 <span className="text-4xl font-bold text-primary">
                   ${getCurrentPrice().toFixed(2)}
                 </span>
-                <span className="text-sm text-muted-foreground">per unit</span>
               </div>
             )}
 
@@ -692,7 +647,7 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
             </div>
           </div>
 
-          {/* Variant Selection */}
+          {/* Variant Selection - DYNAMIC */}
           {hasVariants && (
             <div className="space-y-4 border-b pb-6">
               <h3 className="font-semibold text-lg">Select Options</h3>
@@ -782,6 +737,7 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
               </div>
             </div>
 
+            {/* FIXED BUTTON - NO SAVINGS TEXT */}
             <Button
               onClick={addToCart}
               disabled={availableStock === 0 || isAddingToCart}
@@ -799,11 +755,6 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
                 <>
                   <ShoppingCart className="h-5 w-5 mr-2" />
                   Add {quantity} to Cart - ${totalPrice.toFixed(2)}
-                  {savings > 0 && (
-                    <span className="ml-2 text-sm opacity-90">
-                      (Save ${(savings * quantity).toFixed(2)})
-                    </span>
-                  )}
                 </>
               )}
             </Button>

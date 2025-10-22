@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Upload, CheckCircle2, AlertCircle, Loader2, Package } from 'lucide-react';
+import { Upload, CheckCircle2, AlertCircle, Loader2, Package, FileJson } from 'lucide-react';
 import { toast } from 'sonner';
 import { parseProducts, extractProductsFromAPI, type ParsedProduct } from '@/lib/product-api-parser';
 
@@ -27,6 +27,28 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
     variantsCreated?: number;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.json')) {
+      toast.error('Please upload a JSON file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      setJsonInput(content);
+      toast.success(`Loaded ${file.name} (${(file.size / 1024).toFixed(1)} KB)`);
+    };
+    reader.onerror = () => {
+      toast.error('Failed to read file');
+    };
+    reader.readAsText(file);
+  };
 
   const handleParseJSON = () => {
     setError(null);
@@ -151,7 +173,7 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
         <CardHeader>
           <CardTitle>Product Import from JSON</CardTitle>
           <CardDescription>
-            Paste your complete Product API JSON below. The system will automatically:
+            Upload your Product API JSON file or paste it below. The system will automatically:
           </CardDescription>
           <ul className="list-disc list-inside mt-2 space-y-1 text-sm text-muted-foreground">
             <li><strong>Group variants by parent product</strong> (colors, flavors, strains)</li>
@@ -161,6 +183,28 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
           </ul>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* FILE UPLOAD BUTTON */}
+          <div className="flex gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            <Button
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isProcessing}
+            >
+              <FileJson className="h-4 w-4 mr-2" />
+              Upload JSON File
+            </Button>
+            <span className="text-sm text-muted-foreground flex items-center">
+              or paste JSON below
+            </span>
+          </div>
+
           <Textarea
             placeholder='Paste your full Product API JSON here...
 
