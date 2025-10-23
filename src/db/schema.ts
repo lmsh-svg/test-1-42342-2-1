@@ -98,6 +98,7 @@ export const productVariants = sqliteTable('product_variants', {
   stockQuantity: integer('stock_quantity').default(0),
   priceModifier: real('price_modifier').default(0),
   isAvailable: integer('is_available', { mode: 'boolean' }).default(false),
+  sourceId: text('source_id'),
   createdAt: text('created_at').notNull(),
 });
 
@@ -116,6 +117,7 @@ export const apiConfigurations = sqliteTable('api_configurations', {
   loadImages: integer('load_images', { mode: 'boolean' }).default(true),
   enableDuplicateMerging: integer('enable_duplicate_merging', { mode: 'boolean' }).default(true),
   categoryMappingRules: text('category_mapping_rules'),
+  imageProxyDomain: text('image_proxy_domain'),
   createdAt: text('created_at').notNull(),
 });
 
@@ -135,6 +137,7 @@ export const apiLogs = sqliteTable('api_logs', {
 export const bulkPricingRules = sqliteTable('bulk_pricing_rules', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   productId: integer('product_id').notNull().references(() => products.id),
+  variantId: integer('variant_id').references(() => productVariants.id),
   minQuantity: integer('min_quantity').notNull(),
   discountType: text('discount_type').notNull(),
   discountValue: real('discount_value').notNull(),
@@ -149,6 +152,16 @@ export const productImages = sqliteTable('product_images', {
   isPrimary: integer('is_primary', { mode: 'boolean' }).default(false),
   displayOrder: integer('display_order').default(0),
   createdAt: text('created_at').notNull(),
+});
+
+export const productCorrections = sqliteTable('product_corrections', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  sourceProductId: text('source_product_id').notNull().unique(),
+  correctedCategory: text('corrected_category'),
+  correctedName: text('corrected_name'),
+  notes: text('notes'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
 });
 
 export const productReviews = sqliteTable('product_reviews', {
