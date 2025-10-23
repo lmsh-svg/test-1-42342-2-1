@@ -3,6 +3,8 @@
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -18,6 +20,7 @@ interface ProductJSONSyncProps {
 
 export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSyncProps) {
   const [jsonInput, setJsonInput] = useState('');
+  const [imageProxyDomain, setImageProxyDomain] = useState('https://chadsflooring.bz');
   const [isProcessing, setIsProcessing] = useState(false);
   const [parseResults, setParseResults] = useState<ParsedProduct[] | null>(null);
   const [syncProgress, setSyncProgress] = useState<{
@@ -229,6 +232,22 @@ export function ProductJSONSync({ apiConfigId, onSyncComplete }: ProductJSONSync
           </ul>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* IMAGE PROXY DOMAIN CONFIGURATION */}
+          <div className="space-y-2">
+            <Label htmlFor="imageProxyDomain">Image Proxy Domain</Label>
+            <Input
+              id="imageProxyDomain"
+              type="url"
+              placeholder="https://chadsflooring.bz"
+              value={imageProxyDomain}
+              onChange={(e) => setImageProxyDomain(e.target.value)}
+              disabled={isProcessing}
+            />
+            <p className="text-xs text-muted-foreground">
+              Configure the clearnet proxy domain for product images (e.g., https://chadsflooring.bz)
+            </p>
+          </div>
+
           {/* FILE UPLOAD BUTTON */}
           <div className="flex gap-2">
             <input

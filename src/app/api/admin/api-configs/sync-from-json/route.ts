@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { products, productImages, bulkPricingRules, productVariants, apiConfigurations } from '@/db/schema';
+import { products, productImages, bulkPricingRules, productVariants, apiConfigurations, productCorrections } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
 // CRITICAL: Process in smaller batches to avoid timeouts
@@ -64,6 +64,26 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
+      // CRITICAL: Check for manual corrections first
+      const correction = await db.select()
+        .from(productCorrections)
+        .where(eq(productCorrections.sourceProductId, sourceId.toString()))
+        .limit(1);
+
+      // Apply corrections if they exist
+      let finalCategory = product.mainCategory || product.category || 'Uncategorized';
+      let finalName = product.name || 'Unnamed Product';
+
+      if (correction.length > 0) {
+        const correctionData = correction[0];
+        if (correctionData.correctedCategory) {
+          finalCategory = correctionData.correctedCategory;
+        }
+        if (correctionData.correctedName) {
+          finalName = correctionData.correctedName;
+        }
+      }
+
       const existingProduct = await db.select()
         .from(products)
         .where(eq(products.sourceId, sourceId.toString()))
@@ -73,17 +93,17 @@ export async function POST(request: NextRequest) {
 
       if (existingProduct.length === 0) {
         const newProductData = {
-          name: product.name || 'Unnamed Product',
+          name: finalName,
           description: product.description || null,
           price: product.price || 0,
           imageUrl: product.imageUrl || product.image || null,
           category: product.category || null,
-          mainCategory: product.mainCategory || product.category || 'Uncategorized',
+          mainCategory: finalCategory,
           subCategory: product.subCategory || null,
           brand: product.brand || null,
           volume: product.volume || null,
-          stockQuantity: product.stockQuantity || 100,
-          isAvailable: true,
+          stockQuantity: product.stockQuantity !== undefined ? product.stockQuantity : 100,
+          isAvailable: product.stockQuantity === 0 ? false : true,
           sourceType: validatedApiConfigId ? 'api' : 'manual',
           sourceId: sourceId.toString(),
           apiConfigId: validatedApiConfigId,
@@ -101,17 +121,17 @@ export async function POST(request: NextRequest) {
         productId = existingProduct[0].id;
 
         const updateData = {
-          name: product.name || existingProduct[0].name,
+          name: finalName,
           description: product.description || existingProduct[0].description,
           price: product.price !== undefined ? product.price : existingProduct[0].price,
           imageUrl: product.imageUrl || product.image || existingProduct[0].imageUrl,
           category: product.category || existingProduct[0].category,
-          mainCategory: product.mainCategory || product.category || existingProduct[0].mainCategory,
+          mainCategory: finalCategory,
           subCategory: product.subCategory || existingProduct[0].subCategory,
           brand: product.brand || existingProduct[0].brand,
           volume: product.volume || existingProduct[0].volume,
           stockQuantity: product.stockQuantity !== undefined ? product.stockQuantity : (existingProduct[0].stockQuantity || 100),
-          isAvailable: true
+          isAvailable: product.stockQuantity === 0 ? false : true
         };
 
         await db.update(products)
