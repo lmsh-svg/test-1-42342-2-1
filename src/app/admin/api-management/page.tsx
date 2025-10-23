@@ -7,10 +7,11 @@ import { AdminTabs } from '@/components/admin/admin-tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, Package } from 'lucide-react';
+import { RefreshCw, Package, Settings } from 'lucide-react';
 import { ProductJSONSync } from './product-json-sync';
 import { useInactivityLogout } from '@/hooks/use-inactivity-logout';
 import { InactivityWarning } from '@/components/auth/inactivity-warning';
+import Link from 'next/link';
 
 interface ApiLog {
   id: number;
@@ -85,6 +86,12 @@ export default function AdminApiManagementPage() {
                 Import products from your Product API JSON. Paste your full API response below to sync products.
               </p>
             </div>
+            <Link href="/admin/product-corrections">
+              <Button variant="outline">
+                <Settings className="h-4 w-4 mr-2" />
+                Manage Corrections
+              </Button>
+            </Link>
           </div>
         </div>
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { productCorrections } from '@/db/schema';
-import { eq, or, like, desc } from 'drizzle-orm';
+import { eq, or, like, desc, sql } from 'drizzle-orm';
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,8 +42,8 @@ export async function GET(request: NextRequest) {
       query = query.where(
         or(
           like(productCorrections.sourceProductId, searchTerm),
-          like(productCorrections.correctedCategory, searchTerm),
-          like(productCorrections.correctedName, searchTerm)
+          sql`${productCorrections.correctedCategory} LIKE ${searchTerm}`,
+          sql`${productCorrections.correctedName} LIKE ${searchTerm}`
         )
       );
     }
