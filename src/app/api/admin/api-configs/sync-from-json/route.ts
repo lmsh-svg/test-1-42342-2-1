@@ -3,16 +3,37 @@ import { db } from '@/db';
 import { products, productImages, bulkPricingRules, productVariants, apiConfigurations } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
+// CRITICAL: Process in smaller batches to avoid timeouts
+const BATCH_SIZE = 50; // Process 50 products at a time
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { apiConfigId, products: requestProducts } = body;
+    const { apiConfigId, products: requestProducts, batchIndex = 0 } = body;
 
-    if (!apiConfigId || typeof apiConfigId !== 'number' || apiConfigId <= 0) {
-      return NextResponse.json({ 
-        error: "Valid apiConfigId is required",
-        code: "INVALID_API_CONFIG_ID" 
-      }, { status: 400 });
+    let validatedApiConfigId: number | null = null;
+
+    if (apiConfigId) {
+      if (typeof apiConfigId !== 'number' || apiConfigId <= 0) {
+        return NextResponse.json({ 
+          error: "Invalid apiConfigId format",
+          code: "INVALID_API_CONFIG_ID" 
+        }, { status: 400 });
+      }
+
+      const configExists = await db.select()
+        .from(apiConfigurations)
+        .where(eq(apiConfigurations.id, apiConfigId))
+        .limit(1);
+
+      if (configExists.length === 0) {
+        return NextResponse.json({ 
+          error: "API configuration not found",
+          code: "API_CONFIG_NOT_FOUND" 
+        }, { status: 404 });
+      }
+
+      validatedApiConfigId = apiConfigId;
     }
 
     if (!requestProducts || !Array.isArray(requestProducts) || requestProducts.length === 0) {
@@ -22,18 +43,11 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Validate apiConfigId exists
-    const configExists = await db.select()
-      .from(apiConfigurations)
-      .where(eq(apiConfigurations.id, apiConfigId))
-      .limit(1);
-
-    if (configExists.length === 0) {
-      return NextResponse.json({ 
-        error: "API configuration not found",
-        code: "API_CONFIG_NOT_FOUND" 
-      }, { status: 404 });
-    }
+    // Calculate batch
+    const startIndex = batchIndex * BATCH_SIZE;
+    const endIndex = Math.min(startIndex + BATCH_SIZE, requestProducts.length);
+    const batch = requestProducts.slice(startIndex, endIndex);
+    const hasMore = endIndex < requestProducts.length;
 
     let productsCreated = 0;
     let productsUpdated = 0;
@@ -41,8 +55,8 @@ export async function POST(request: NextRequest) {
     let imagesCreated = 0;
     let variantsCreated = 0;
 
-    // Process each product
-    for (const product of requestProducts) {
+    // Process batch
+    for (const product of batch) {
       const sourceId = product.sourceId || product.id || product.name;
       
       if (!sourceId) {
@@ -50,7 +64,6 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Check if product exists
       const existingProduct = await db.select()
         .from(products)
         .where(eq(products.sourceId, sourceId.toString()))
@@ -59,7 +72,6 @@ export async function POST(request: NextRequest) {
       let productId: number;
 
       if (existingProduct.length === 0) {
-        // NEW PRODUCT - Insert
         const newProductData = {
           name: product.name || 'Unnamed Product',
           description: product.description || null,
@@ -70,11 +82,11 @@ export async function POST(request: NextRequest) {
           subCategory: product.subCategory || null,
           brand: product.brand || null,
           volume: product.volume || null,
-          stockQuantity: product.stockQuantity || 0,
+          stockQuantity: product.stockQuantity || 100,
           isAvailable: true,
-          sourceType: 'api',
+          sourceType: validatedApiConfigId ? 'api' : 'manual',
           sourceId: sourceId.toString(),
-          apiConfigId: apiConfigId,
+          apiConfigId: validatedApiConfigId,
           isLocalOnly: false,
           createdAt: new Date().toISOString()
         };
@@ -86,7 +98,6 @@ export async function POST(request: NextRequest) {
         productId = insertedProduct.id;
         productsCreated++;
       } else {
-        // EXISTING PRODUCT - Update
         productId = existingProduct[0].id;
 
         const updateData = {
@@ -99,7 +110,7 @@ export async function POST(request: NextRequest) {
           subCategory: product.subCategory || existingProduct[0].subCategory,
           brand: product.brand || existingProduct[0].brand,
           volume: product.volume || existingProduct[0].volume,
-          stockQuantity: product.stockQuantity || existingProduct[0].stockQuantity,
+          stockQuantity: product.stockQuantity !== undefined ? product.stockQuantity : (existingProduct[0].stockQuantity || 100),
           isAvailable: true
         };
 
@@ -107,7 +118,6 @@ export async function POST(request: NextRequest) {
           .set(updateData)
           .where(eq(products.id, productId));
 
-        // Delete existing related records for clean update
         await db.delete(productImages)
           .where(eq(productImages.productId, productId));
 
@@ -137,7 +147,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Insert product variants (NEW!)
+      // Insert product variants
       if (product.variants && Array.isArray(product.variants) && product.variants.length > 0) {
         for (const variant of product.variants) {
           if (variant.variantName) {
@@ -148,16 +158,17 @@ export async function POST(request: NextRequest) {
               stockQuantity: variant.stockQuantity || 0,
               priceModifier: variant.priceModifier || 0,
               isAvailable: variant.isAvailable !== false,
+              sourceId: variant.sourceId || null,
               createdAt: new Date().toISOString()
             }).returning();
             variantsCreated++;
 
-            // Insert variant-specific tiers
             if (variant.tiers && Array.isArray(variant.tiers) && variant.tiers.length > 0) {
               for (const tier of variant.tiers) {
                 if (tier.minQuantity !== undefined && tier.price !== undefined) {
                   await db.insert(bulkPricingRules).values({
                     productId: productId,
+                    variantId: insertedVariant.id,
                     minQuantity: tier.minQuantity,
                     discountType: 'fixed_price',
                     discountValue: 0,
@@ -171,12 +182,12 @@ export async function POST(request: NextRequest) {
           }
         }
       } else {
-        // No variants - insert base product tiers
         if (product.pricingTiers && Array.isArray(product.pricingTiers) && product.pricingTiers.length > 0) {
           for (const tier of product.pricingTiers) {
             if (tier.minQuantity !== undefined && tier.price !== undefined) {
               await db.insert(bulkPricingRules).values({
                 productId: productId,
+                variantId: null,
                 minQuantity: tier.minQuantity,
                 discountType: 'fixed_price',
                 discountValue: 0,
@@ -197,11 +208,18 @@ export async function POST(request: NextRequest) {
       tiersCreated,
       imagesCreated,
       variantsCreated,
-      message: `Successfully synced ${productsCreated + productsUpdated} products (${productsCreated} created, ${productsUpdated} updated) with ${variantsCreated} variants, ${tiersCreated} pricing tiers, and ${imagesCreated} images`
+      hasMore,
+      nextBatchIndex: hasMore ? batchIndex + 1 : null,
+      progress: {
+        processed: endIndex,
+        total: requestProducts.length,
+        percentage: Math.round((endIndex / requestProducts.length) * 100)
+      },
+      message: `Batch ${batchIndex + 1}: Processed ${batch.length} products (${productsCreated} created, ${productsUpdated} updated)`
     }, { status: 201 });
 
   } catch (error) {
-    console.error('POST error:', error);
+    console.error('POST /api/admin/api-configs/sync-from-json error:', error);
     return NextResponse.json({ 
       error: 'Internal server error: ' + (error instanceof Error ? error.message : 'Unknown error')
     }, { status: 500 });
